@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: gptstore
+      POSTGRES_USER: gptstore
+      POSTGRES_PASSWORD: change-me
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gptstore -d gptstore"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    ports:
+      - "5432:5432"
+    networks:
+      - gptstore-net
+
+  api:
+    build:
+      context: ../api
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://gptstore:change-me@db:5432/gptstore
+      RATE_LIMITS: "key:60/m,write:10/m,ip:600/5m"
+      LOG_LEVEL: INFO
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - gptstore-net
+    restart: unless-stopped
+
+  backup:
+    build:
+      context: ./backup
+      dockerfile: Dockerfile
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_USER: gptstore
+      POSTGRES_PASSWORD: change-me
+      POSTGRES_DB: gptstore
+      BACKUP_RETENTION_DAYS: 14
+    volumes:
+      - db-backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - gptstore-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "test", "-f", "/var/log/cron.log"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  db-data:
+    driver: local
+  db-backups:
+    driver: local
+
+networks:
+  gptstore-net:
+    driver: bridge
