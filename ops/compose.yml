@@ -57,6 +57,8 @@ services:
       POSTGRES_PASSWORD: change-me
       POSTGRES_DB: gptstore
       BACKUP_RETENTION_DAYS: 14
+      # For testing: run backup every N minutes instead of daily at 02:30
+      # BACKUP_INTERVAL_MINUTES: 5
     volumes:
       - db-backups:/backups
     depends_on:

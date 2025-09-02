@@ -1,8 +1,7 @@
-FROM alpine:3.18
+FROM postgres:17-alpine
 
-# Install required packages
+# Install additional packages needed for backup
 RUN apk add --no-cache \
-    postgresql-client \
     bash \
     curl \
     findutils
@@ -13,14 +12,12 @@ RUN addgroup -g 1001 backup && \
     mkdir -p /backups /scripts /var/log && \
     chown -R backup:backup /backups /scripts
 
-# Copy scripts and configuration
+# Copy backup scripts
 COPY --chown=backup:backup backup.sh /scripts/backup.sh
-COPY --chown=root:root crontab /etc/crontabs/root
-COPY --chown=root:root entrypoint.sh /entrypoint.sh
+COPY --chown=root:root run-backup.sh /scripts/run-backup.sh
 
 # Make scripts executable
-RUN chmod +x /scripts/backup.sh /entrypoint.sh && \
-    chmod 0600 /etc/crontabs/root
+RUN chmod +x /scripts/backup.sh /scripts/run-backup.sh
 
 # Create log file with proper permissions
 RUN touch /var/log/cron.log && \
@@ -29,9 +26,9 @@ RUN touch /var/log/cron.log && \
 # Set working directory
 WORKDIR /backups
 
-# Health check - verify cron is running
+# Health check - verify backup scheduler is running
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD pgrep crond > /dev/null || exit 1
+    CMD ps aux | grep -v grep | grep -q run-backup.sh || exit 1
 
-# Use entrypoint script to start cron
-ENTRYPOINT ["/entrypoint.sh"]
+# Run the backup scheduler
+CMD ["/scripts/run-backup.sh"]
