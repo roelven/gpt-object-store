@@ -14,6 +14,7 @@ from .db.connection import db_manager, get_db_pool
 from .errors import register_exception_handlers, create_problem_response
 from .errors.problem_details import ServiceUnavailableError
 from .routes import collections_router
+from .routes.objects import collection_objects_router, objects_router
 
 # Configure logging
 logging.basicConfig(
@@ -87,6 +88,8 @@ def create_app() -> FastAPI:
     
     # Register API routes with version prefix
     app.include_router(collections_router, prefix="/v1")
+    app.include_router(collection_objects_router, prefix="/v1")
+    app.include_router(objects_router, prefix="/v1")
     
     # Health check endpoint
     @app.get("/health", tags=["Health"])
