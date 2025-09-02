@@ -5,7 +5,7 @@ import asyncio
 import os
 from typing import List, Dict, Any
 import asyncpg
-from src.db.connection import get_database_url
+from src.config import get_settings
 
 
 @pytest.fixture(scope="session")
@@ -19,8 +19,8 @@ def event_loop():
 @pytest.fixture(scope="session")
 async def db_connection():
     """Create a database connection for testing."""
-    database_url = get_database_url()
-    conn = await asyncpg.connect(database_url)
+    settings = get_settings()
+    conn = await asyncpg.connect(settings.database_url)
     yield conn
     await conn.close()
 
