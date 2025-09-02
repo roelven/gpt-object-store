@@ -13,6 +13,7 @@ from .config import get_settings
 from .db.connection import db_manager, get_db_pool
 from .errors import register_exception_handlers, create_problem_response
 from .errors.problem_details import ServiceUnavailableError
+from .rate_limit.middleware import RateLimitMiddleware
 from .routes import collections_router
 from .routes.objects import collection_objects_router, objects_router
 
@@ -73,6 +74,9 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json",
         lifespan=lifespan
     )
+    
+    # Add rate limiting middleware (before CORS to limit all requests)
+    app.add_middleware(RateLimitMiddleware)
     
     # Configure CORS
     app.add_middleware(
