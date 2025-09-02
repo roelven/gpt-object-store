@@ -1,6 +1,9 @@
 # GPT Object Store Database Backup Schedule
-# Runs nightly at 02:30 UTC with logging
-30 2 * * * /scripts/backup.sh >> /var/log/cron.log 2>&1
+# Runs nightly at 02:30 UTC with logging as backup user
+30 2 * * * su -c "/scripts/backup.sh" backup >> /var/log/cron.log 2>&1
 
 # Log rotation marker - runs daily at 02:00 UTC
 0 2 * * * echo "$(date): Daily backup cycle starting" >> /var/log/cron.log
+
+# Keep cron alive - runs every minute (for debugging, can be removed in production)
+* * * * * echo "$(date): Cron is running" >> /var/log/cron.log

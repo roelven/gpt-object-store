@@ -3,7 +3,6 @@ FROM alpine:3.18
 # Install required packages
 RUN apk add --no-cache \
     postgresql-client \
-    dcron \
     bash \
     curl \
     findutils
@@ -12,33 +11,27 @@ RUN apk add --no-cache \
 RUN addgroup -g 1001 backup && \
     adduser -D -u 1001 -G backup backup && \
     mkdir -p /backups /scripts /var/log && \
-    chown -R backup:backup /backups /scripts /var/log
+    chown -R backup:backup /backups /scripts
 
 # Copy scripts and configuration
-COPY backup.sh /scripts/backup.sh
-COPY crontab /tmp/crontab
+COPY --chown=backup:backup backup.sh /scripts/backup.sh
+COPY --chown=root:root crontab /etc/crontabs/root
+COPY --chown=root:root entrypoint.sh /entrypoint.sh
 
-# Make scripts executable and set up cron
-RUN chmod +x /scripts/backup.sh && \
-    crontab -u backup /tmp/crontab && \
-    rm /tmp/crontab
+# Make scripts executable
+RUN chmod +x /scripts/backup.sh /entrypoint.sh && \
+    chmod 0600 /etc/crontabs/root
 
-# Create log file for cron
+# Create log file with proper permissions
 RUN touch /var/log/cron.log && \
-    chown backup:backup /var/log/cron.log
-
-# Switch to backup user
-USER backup
-
-# Create initial log entries
-RUN echo "$(date): Backup container initialized" >> /var/log/cron.log
+    chmod 666 /var/log/cron.log
 
 # Set working directory
 WORKDIR /backups
 
-# Health check - verify cron is running and log file exists
+# Health check - verify cron is running
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD test -f /var/log/cron.log && pgrep crond > /dev/null
+    CMD pgrep crond > /dev/null || exit 1
 
-# Start cron in foreground with logging
-CMD ["sh", "-c", "crond -f -L /var/log/cron.log"]
+# Use entrypoint script to start cron
+ENTRYPOINT ["/entrypoint.sh"]
