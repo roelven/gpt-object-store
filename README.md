@@ -28,6 +28,23 @@ A production-ready, PostgreSQL-backed REST API for multiple Custom GPTs to persi
 - Docker & Docker Compose (for containerized deployment)
 - 2GB+ RAM recommended
 
+## 📚 Documentation
+
+- **[Custom GPT Integration Guide](CUSTOM_GPT_GUIDE.md)** - Step-by-step guide to building Custom GPTs with persistent storage
+- **[API Reference](#api-documentation)** - Complete API endpoint documentation
+- **[Deployment Guide](#docker-deployment)** - Production deployment instructions
+
+## 🌟 Example Use Cases
+
+Build powerful Custom GPTs with persistent memory:
+
+- **📔 Daily Diary GPT** - Personal journaling with weekly summaries ([Full Tutorial](CUSTOM_GPT_GUIDE.md))
+- **📊 Habit Tracker** - Track daily habits and visualize progress
+- **📚 Learning Journal** - Document and review your learning journey
+- **🏋️ Workout Logger** - Store exercise routines and track PRs
+- **📝 Meeting Notes** - Organize and search meeting transcripts
+- **🎯 Goal Manager** - Set, track, and review personal goals
+
 ## 🏗️ Architecture
 
 ```
