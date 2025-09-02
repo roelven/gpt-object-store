@@ -1,54 +1,50 @@
-# GPT Object Store (Multi-GPT, JSONB, OAuth-ready)
+CLAUDE.md — GPT Object Store (Multi-GPT, JSONB, OAuth-ready, Postgres-only)
 
-## Executive summary
+0) Executive summary
+Build a small, durable backend for multiple Custom GPTs to persist and retrieve JSON documents via a public HTTPS API. Storage uses PostgreSQL 17 JSONB with targeted GIN indexes. The API is OpenAPI 3.1 described (so GPT Actions can call it) and ships with required cursor or seek pagination, API-key auth now with a non-breaking path to OAuth 2.0 later, sensible rate limits, and nightly backups from day one. Use Problem Details (RFC 9457) for errors and Link headers (RFC 8288) for pagination. Add explicit Docker Compose bring-up tests with log parsing, and require every sub-agent to finish each implementation task with a git commit to maintain tight versioning. This project is Postgres-only; do not use SQLite.
 
-Build a small, durable backend for multiple Custom GPTs to persist and retrieve JSON documents via a public HTTPS API. Storage uses PostgreSQL JSONB (with targeted GIN indexes). The API is OpenAPI 3.1 described (so GPT Actions can call it) and ships with required cursor/keyset pagination, API-key auth now with a non-breaking path to OAuth 2.0 later, sensible rate limits, and nightly backups from day one. References: OpenAI Actions expect OpenAPI schemas and support API Key/OAuth flows; use Problem Details (RFC 9457) for errors and Link headers (RFC 8288) for pagination. 
+1) Goals and Non-Goals
+Goals
+- Store arbitrary, GPT-defined JSON documents with first-class collections per GPT.
+- One API usable by many GPTs at once; all data strictly scoped by gpt_id.
+- Required keyset or seek pagination (recency at least), stable ordering.
+- Public HTTPS API with OpenAPI 3.1 for easy Actions integration.
+- Auth v1: API key via Authorization: Bearer <token>. Auth v2: add OAuth 2.0 without breaking clients (stay on Bearer per RFC 6750).
+- Nightly backups using pg_dump with rotation.
+- Sensible rate limits with 429 and Retry-After.
+- Verified Docker Compose bring-up with automated log hygiene checks.
+- Strict git hygiene: each sub-agent task ends with an atomic commit including the required footer.
+- Postgres-only stance across code, docs, tests, and scripts.
 
+Non-Goals (for v1)
+- End-user OAuth UI flows (design for it, implement later).
+- Full-text search across JSON fields beyond targeted JSONB and GIN usage.
+- Rich query DSL; keep filters minimal with strong ordering.
 
-## 1) Goals & Non-Goals
+2) Architecture overview
+- API service (FastAPI or Express).
+- PostgreSQL 17 (JSONB storage plus GIN indexes).
+- Backup sidecar (cron plus pg_dump nightly).
+- Ingress and TLS handled by the installer or operator (no proxy service in Compose).
 
-**Goals**
+Why JSONB
+- Flexible per-GPT schemas, native operators, and GIN support for containment and jsonpath queries.
 
-* Store arbitrary, GPT-defined JSON documents with first-class collections per GPT.
-* One API usable by many GPTs at once; all data strictly scoped by gpt_id.
-* Required keyset/cursor pagination (recency at least), stable ordering. 
-* Public HTTPS API with OpenAPI 3.1 for easy Actions integration. 
-* Auth v1: API key via `Authorization: Bearer <token>`. Auth v2: add OAuth 2.0 w/o breaking clients (remain on Bearer per RFC 6750). 
-* Nightly backups using `pg_dump` with rotation. 
-* Sensible rate limits + 429/Retry-After. (OWASP guidance) 
+3) Data model (DDL)
+Postgres, UTC. Use UUID v4 defaults via gen_random_uuid() (requires pgcrypto on some installs).
 
-**Non-Goals (for v1)**
-
-* End-user OAuth flows (we only design for it now).
-* Full-text search/indexing across JSON fields (beyond GIN where useful).
-* Rich query DSL; only minimal filters + strong ordering.
-
-## 2) Architecture overview
-
-* API service (FastAPI or Express).
-* PostgreSQL 17 (JSONB storage + GIN indexes).
-* Backup sidecar (cron + pg_dump nightly).
-* Ingress/TLS handled by the installer/user (no proxy service in Compose).
-
-**Why JSONB?** Flexible per-GPT schemas, strong operators, and GIN support for containment/jsonpath queries.
-
-
-## 3) Data model (DDL)
-
-Postgres, UTC. Use UUID v4 defaults via `gen_random_uuid()` (requires `pgcrypto`).
-
-```
--- Enable extension for gen_random_uuid on some installs
+```sql
+-- Optional extension (depends on distro)
 -- CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE gpts (
-  id         TEXT PRIMARY KEY,                -- your chosen gpt-id
+  id         TEXT PRIMARY KEY,
   name       TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE api_keys (
-  token_hash BYTEA PRIMARY KEY,               -- store hash of the API key (never plaintext)
+  token_hash BYTEA PRIMARY KEY,               -- store hash of the API key
   gpt_id     TEXT NOT NULL REFERENCES gpts(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   last_used  TIMESTAMPTZ
@@ -57,7 +53,7 @@ CREATE TABLE api_keys (
 CREATE TABLE collections (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   gpt_id     TEXT NOT NULL REFERENCES gpts(id),
-  name       TEXT NOT NULL,                   -- e.g., "notes"
+  name       TEXT NOT NULL,                   -- e.g., notes
   schema     JSONB,                           -- optional JSON Schema for validation
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (gpt_id, name)
@@ -66,56 +62,46 @@ CREATE TABLE collections (
 CREATE TABLE objects (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   gpt_id      TEXT NOT NULL REFERENCES gpts(id) ON DELETE CASCADE,
-  collection  TEXT NOT NULL,                  -- fk to collections.name scoped by gpt_id
-  body        JSONB NOT NULL,                 -- GPT-defined shape
+  collection  TEXT NOT NULL,
+  body        JSONB NOT NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   FOREIGN KEY (gpt_id, collection) REFERENCES collections(gpt_id, name) ON DELETE CASCADE
 );
 
--- Seek-friendly index (recency + deterministic tie-break)
-CREATE INDEX objects_gpt_coll_created_desc ON objects (gpt_id, collection, created_at DESC, id DESC);
+CREATE INDEX objects_gpt_coll_created_desc
+  ON objects (gpt_id, collection, created_at DESC, id DESC);
 
--- Query inside JSON when needed (containment/jsonpath)
 CREATE INDEX objects_body_gin ON objects USING GIN (body);
-
 ```
-> Prefer JSONB + GIN judiciously; measure before adding more JSON-field indexes.
 
+4) API design (v1, OAuth-ready)
+Base: https://api.yourdomain.com/v1
+Auth header (now and later): Authorization: Bearer <token> (API key today; OAuth access tokens later per RFC 6750).
+Errors: application/problem+json (RFC 9457).
+Pagination: required keyset or seek using (created_at, id); include Link headers for next and prev (RFC 8288).
 
-## 4) API design (v1, OAuth-ready)
+Endpoints (minimum set)
+- Collections
+  - POST   /gpts/{gpt_id}/collections     create or upsert a collection with optional stored JSON Schema
+  - GET    /gpts/{gpt_id}/collections     list collections with limit, cursor, order
+  - GET    /gpts/{gpt_id}/collections/{name}  fetch one
+- Objects
+  - POST   /gpts/{gpt_id}/collections/{name}/objects     create
+  - GET    /gpts/{gpt_id}/collections/{name}/objects     list with limit, cursor, order
+  - GET    /objects/{id}                                 fetch one
+  - PATCH  /objects/{id}                                 partial update
+  - DELETE /objects/{id}                                 delete
 
-* Base: https://api.yourdomain.com/v1
-* Auth header (now & later): Authorization: Bearer <token> (API key today; OAuth access tokens later per RFC 6750).
-* Errors: `application/problem+json` (RFC 9457).
-* Pagination: Required keyset/cursor using (`created_at`, `id`); include `Link` headers for `next`/`prev` (RFC 8288).
+Seek pagination contract
+- Sort: ORDER BY created_at DESC, id DESC (stable and deterministic).
+- Cursor encodes (created_at, id, filters); client supplies cursor to continue.
+- Response includes next_cursor, has_more, and Link header with rel="next" when more pages exist.
 
+5) OpenAPI (Actions-friendly, OAuth-ready)
+Ship an OpenAPI 3.1 file (checked into repo); GPT Actions consume this schema and support API Key and OAuth.
 
-### Endpoints (minimum set)
-
-* Collections
-  * `POST /gpts/{gpt_id}/collections` – create/update (optional stored JSON Schema)
-  * `GET /gpts/{gpt_id}/collections?limit&cursor&order` – list (paginated)
-  * `GET /gpts/{gpt_id}/collections/{name}` – fetch one
-* Objects
-  * `POST /gpts/{gpt_id}/collections/{name}/objects` – create
-  * `GET /gpts/{gpt_id}/collections/{name}/objects?limit&cursor&order` – list (paginated, recency)
-  * `GET /objects/{id}` – fetch one
-  * `PATCH /objects/{id}` – partial update
-  * `DELETE /objects/{id}` – delete
-
-**Seek pagination contract**
-
-* Sort: `ORDER BY created_at DESC, id DESC` (stable, deterministic).
-* Cursor encodes `(created_at, id, filters)`; client supplies `cursor` to continue.
-* Response includes `next_cursor`, `has_more`, and a `Link` header with `rel="next"``.
-
-
-## 5) OpenAPI (Actions-friendly, OAuth-ready)
-
-Ship an OpenAPI **3.1** file (checked into repo); GPT Actions consume this schema and support API Key and OAuth. 
-
-```
+```yaml
 openapi: 3.1.0
 info: { title: GPT Object Store, version: "1.0.0" }
 servers: [{ url: https://api.yourdomain.com/v1 }]
@@ -135,47 +121,53 @@ components:
             objects:read: Read objects
             objects:write: Write objects
 security:
-  - bearerApiKey: []   # swap to oauth2 later without changing paths
+  - bearerApiKey: []
 paths:
   /gpts/{gpt_id}/collections/{name}/objects:
     get:
       summary: List objects (recency-ordered)
       parameters:
-        - in: path; name: gpt_id; required: true; schema: { type: string }
-        - in: path; name: name; required: true; schema: { type: string }
-        - in: query; name: limit; schema: { type: integer, default: 50, maximum: 200 }
-        - in: query; name: cursor; schema: { type: string }
-        - in: query; name: order; schema: { type: string, enum: [asc, desc], default: desc }
+        - in: path
+          name: gpt_id
+          required: true
+          schema: { type: string }
+        - in: path
+          name: name
+          required: true
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50, maximum: 200 }
+        - in: query
+          name: cursor
+          schema: { type: string }
+        - in: query
+          name: order
+          schema: { type: string, enum: [asc, desc], default: desc }
       responses:
         "200": { description: OK }
         "400": { description: Bad Request, content: { application/problem+json: {} } }
         "401": { description: Unauthorized, content: { application/problem+json: {} } }
 ```
 
-## 6) Rate limiting (built-in)
+6) Rate limiting (built-in)
+- Per API key default 60 requests per minute; writes 10 per minute.
+- Per IP defense in depth 600 requests per 5 minutes.
+- On breach: 429 Too Many Requests and Retry-After header.
+- Log key, IP, route, and decision for observability.
 
-* **Per API key**: default `60 req/min`; writes `10 req/min`.
-* **Per IP** (defense-in-depth): `600 req/5min`.
-* On breach: `429 Too Many Requests` + `Retry-After`.
-* Log key, IP, route, and decision for observability.
+7) Backups (nightly from day one)
+Backup sidecar runs pg_dump nightly and keeps the last N days (for example 14). Prefer custom format -Fc for selective restore.
 
-
-## 7) Backups (nightly from day 1)
-
-Backup sidecar runs pg_dump nightly and keeps the last N days (e.g., 14). Prefer custom format `-Fc` for selective restore.
-
-Example cron line inside sidecar:
+Example cron line inside sidecar
 ```
-30 02 * * * /usr/bin/pg_dump -h db -U gptstore -Fc gptstore \
-  > /backups/backup-$(date +\%F-\%H\%M).dump && \
-  find /backups -type f -mtime +14 -delete
+30 02 * * * /usr/bin/pg_dump -h db -U gptstore -Fc gptstore > /backups/backup-$(date +\%F-\%H\%M).dump && find /backups -type f -mtime +14 -delete
 ```
 
+8) Docker Compose (no proxy or ingress)
+Use the Compose Specification for services and volumes; end user provides TLS and ingress. The project must include automated bring-up and log checks to ensure services are healthy and do not emit error-severity logs during normal startup and idle operation.
 
-## 8) Docker Compose
-
-Use the Compose Specification for services/volumes; end user provides TLS/ingress.
-```
+```yaml
 # ops/compose.yml
 services:
   db:
@@ -199,7 +191,7 @@ services:
       RATE_LIMITS: "key:60/m,write:10/m,ip:600/5m"
     depends_on: [db]
     ports:
-      - "8000:8000"   # public ingress handled by the installer
+      - "8000:8000"
 
   backup:
     image: alpine:3
@@ -207,19 +199,32 @@ services:
       - db-backups:/backups
     depends_on: [db]
     command: ["/bin/sh", "-c", "crond -f -L /var/log/cron.log"]
-    # Dockerfile/entrypoint installs: postgresql-client, sets /etc/crontabs/root with the job above
+    # Dockerfile installs postgresql-client and writes crontab with the job above
 
 volumes:
   db-data:
   db-backups:
-
 ```
 
+9) Implementation plan (agent-oriented)
 
-## 9) Implementation plan (agent-oriented)
+9.1 Process guardrails (enforced)
+- Ask first when context is missing.
+- TDD sequence for every unit of work: write failing test, implement code, verify all tests pass, git commit.
+- Use full paths for every command executed by agents.
+- Each test has a timeout; entire suite completes in 10 seconds or less.
+- Keep each file under 300 lines; refactor when necessary.
+- Clear and simple code; comment the why, not the what.
+- Logging workflow: add logs during implementation and debugging, remove debug logs when stable; retain structured info logs as needed.
 
-### 9.1 Directory layout
+9.2 Git and versioning rules (tight enforcement)
+- Every sub-agent and every implementation task must end with an atomic git commit. Do not leave the working tree dirty.
+- Commit granularity one responsibility per commit; no bundling unrelated changes.
+- Required footer appended to every commit message exactly as specified.
+- Before switching tasks, run /usr/bin/git status --porcelain and ensure no changes. If changes exist, commit or revert.
+- Provide descriptive commit subject lines.
 
+9.3 Directory layout
 ```
 /full/path/to/
   api/
@@ -244,13 +249,10 @@ volumes:
     backup/
       Dockerfile
       crontab
-  .github/workflows/ci.yaml
   CLAUDE.md
-  EVAL.md
 ```
 
-### 9.3 Pseudocode (high level)
-
+9.4 Pseudocode (high level)
 ```
 INIT:
   load env; connect to Postgres; run migrations
@@ -268,8 +270,8 @@ PAGINATION HELPERS:
   decode_cursor -> (ts, id, filters)
 
 LIST OBJECTS:
-  validate gpt_id & collection
-  build query:
+  validate gpt_id and collection
+  query:
      ORDER BY created_at DESC, id DESC
      if cursor: WHERE (created_at, id) < (ts, id)
      LIMIT <= max_limit
@@ -277,65 +279,58 @@ LIST OBJECTS:
 
 WRITE OBJECT:
   optional: validate body against stored JSON Schema (if present)
-  insert (gpt_id, collection, body) returning id, timestamps
+  insert (gpt_id, collection, body) returning id and timestamps
 
-PATCH/DELETE:
-  authorize (by gpt_id); apply change; return 204/200
+PATCH and DELETE:
+  authorize by gpt_id; apply change; return 204 or 200
 
 ERRORS:
-  on any failure return RFC9457 Problem Details
+  return RFC 9457 Problem Details on failure
 
 RATE LIMITING:
-  token-bucket in-memory + (optional) sliding window per key/IP
-  on exceed -> 429 + Retry-After
+  token-bucket per key and optional per IP
+  exceed -> 429 with Retry-After
 
 BACKUP:
-  backup sidecar runs nightly pg_dump and rotates files
+  sidecar runs nightly pg_dump and rotates files
 ```
 
+9.5 Tests (examples)
+- Auth
+  - Missing or invalid Bearer yields 401 Problem Details.
+  - Valid API key injects correct gpt_id.
+- Collections
+  - Create is idempotent on (gpt_id, name).
+  - List paginated with Link header present.
+- Objects
+  - Create, read, patch updates updated_at, delete returns 204.
+  - List stable order by (created_at, id) with seek pagination across pages.
+  - Tampered cursor yields 400 Problem Details.
+- Rate limiting
+  - Exceed read or write caps yields 429 with Retry-After.
+- Errors
+  - Handlers return Problem Details shape on failures.
+- Backups
+  - Cron exists; command invokes pg_dump and rotation.
+- Docker Compose bring-up and log hygiene
+  - Build succeeds.
+  - Up in detached mode succeeds.
+  - All services reach healthy state.
+  - Logs contain no forbidden error patterns during startup and 30 seconds idle.
 
-### 9.4 Tests (examples)
+10) SQL and pagination details
+Why keyset or seek instead of OFFSET
+- Avoid scanning and discarding N rows, scale better, deterministic order with tiebreaker on id.
 
-* **Auth**
-  * rejects missing/invalid Bearer → 401 Problem Details
-  * accepts valid API key → injects correct gpt_id
-* **Collections**
-  * create, idempotent on same (gpt_id, name)
-  * list with pagination; `Link` header present
-* **Objects**
-  * create/read/patch/delete happy paths
-  * list: stable order by (`created_at, id`); **seek pagination** across pages
-  * cursor includes filters; tampered cursor → 400 Problem Details
-* **Rate limiting**
-  * hit read/write caps → 429 + `Retry-After`
-* **Errors**
-  * every handler returns Problem Details shape on failure
-* **Backups**
-  * cron file exists; command includes `pg_dump` and rotation
-
-> Enforce per-test timeouts; whole suite ≤ 10s. (Design fast tests with small in-memory data or a local Postgres fixture.)
-
-
-### 9.5 CI
-
-* Lint + typecheck
-* Run unit tests (≤ 10s)
-* Generate OpenAPI from source (if code-first) and validate schema
-
-### 10) SQL & pagination details
-
-**Why keyset/seek, not OFFSET?** Avoids scanning/throwing away N rows; scales better. Use composite ordering `(created_at DESC, id DESC)` for determinism. 
-
-**Example queries**
-
-```
+Example queries
+```sql
 -- first page
 SELECT * FROM objects
 WHERE gpt_id = $1 AND collection = $2
 ORDER BY created_at DESC, id DESC
 LIMIT $3;
 
--- with cursor(ts, id)
+-- with cursor (ts, id)
 SELECT * FROM objects
 WHERE gpt_id = $1 AND collection = $2
   AND (created_at, id) < ($3::timestamptz, $4::uuid)
@@ -343,75 +338,44 @@ ORDER BY created_at DESC, id DESC
 LIMIT $5;
 ```
 
-### 11) Security notes (baseline)
+11) Security notes (baseline)
+- HTTPS only; never accept plaintext.
+- Auth today API key Bearer tokens stored hashed; no plaintext API keys at rest.
+- Auth tomorrow OAuth 2.0 Authorization Code with PKCE or Client Credentials; same Authorization Bearer header (no path or schema changes).
+- Error format RFC 9457 Problem Details.
+- Resource controls with rate limits and timeouts.
 
-* HTTPS only; never accept plaintext.
-* Auth today: API key Bearer tokens (opaque), stored hashed.
-* Auth tomorrow: OAuth 2.0 Authorization Code + PKCE or Client Credentials. Same `Authorization: Bearer` header per RFC 6750 (no path/shape changes).
-* Error format: RFC 9457 Problem Details — consistent, machine-readable.
-* Resource controls: rate limits/timeouts to mitigate unrestricted resource consumption.
+12) Deliverables (Definition of Done)
+- ops/compose.yml includes db, api, backup only; no proxy or ingress service.
+- Postgres migrations with tables and indexes above.
+- API service with:
+  - API key Bearer auth middleware
+  - Collections and Objects endpoints
+  - Required seek pagination with Link headers
+  - Problem Details errors
+  - Rate limiting with 429 and Retry-After
+- OpenAPI 3.1 file api/openapi/gpt-object-store.yaml with API key security scheme and placeholder oauth2 scheme.
+- Backup sidecar Dockerfile and cron config using pg_dump -Fc nightly.
+- Test suite within 10 seconds demonstrating all behaviors above, with at least 90 percent of tests passing.
+- Docker Compose bring-up test and log hygiene check scripts or make targets that an evaluator can run with full paths.
+- Git hygiene:
+  - No uncommitted changes after any task
+  - Each task ends with an atomic commit including the required footer
 
+13) Open questions (Ask-First for the agent)
+- Preferred language and runtime (FastAPI Python or Express or NestJS Node).
+- Expected maximum throughput to tune default rate limits.
+- Desired backup retention window (default 14 days).
+- Any initial JSON Schemas to validate per collection.
+- CORS needed for browser clients or only server-to-server via Actions.
 
-### 12) Deliverables (Definition of Done)
-
-* `docker-compose.yml` (db, api, backup) — no proxy/ingress defined.
-* Postgres migrations (tables + indexes above).
-* API service with:
-  * Auth middleware (API key Bearer)
-  * Collections + Objects endpoints
-  * Required **seek pagination** + `Link` headers (RFC 8288)
-  * Problem Details errors (RFC 9457)
-  * Rate limiting (per key/IP) with 429 + Retry-After
-* OpenAPI 3.1 file `api/openapi/gpt-object-store.yaml` (API key security scheme + placeholder oauth2 scheme).
-* Backup sidecar Dockerfile + cron config using `pg_dump -Fc` nightly.
-* Test suite (≤ 10s) proving all behaviors above.
-
-
-### 13) Open questions (ASK-FIRST for the agent)
-
-1. Preferred language/runtime (FastAPI Python vs. Express/NestJS Node)?
-2. Expected maximum throughput (to tune default rate limits)?
-3. Desired retention for backups (default 14 days ok)?
-4. Any initial JSON Schemas to validate per collection?
-5. Do we need CORS for browser clients (not required for GPT Actions)?
-
-
-### 14) References
-
-- Web Linking (`Link` headers) — RFC 8288
-- Problem Details — RFC 9457 (obsoletes 7807)
-- OAuth 2.0 (RFC 6749) & Bearer Tokens (RFC 6750)
-- OpenAPI 3.1 (official spec)
-- PostgreSQL JSONB & GIN indexes (official docs)
-- `pg_dump` (official docs)
-- OWASP REST/API security guidance (rate limiting)
-
-
-### 15) First sprint — concrete tasks
-
-> Follow the TDD sequence for every task. Keep each file under 300 lines.
-
-1. Scaffold API service (+ health check)
-2. DB migrations for gpts, api_keys, collections, objects (+ indexes)
-3. Auth middleware (API key)
-4. Collections CRUD (read-heavy)
-5. Objects write + read
-6. Seek pagination helpers
-7. Rate limiting middleware
-8. Problem Details everywhere
-9. OpenAPI 3.1 file (API-key default + oauth2 placeholder)
-10. Backup sidecar
-
-
-### 16) Acceptance criteria checklist
-
-- [ ] OpenAPI 3.1 present; pasteable into GPT Actions; uses Bearer API key
-- [ ] All list endpoints implement seek pagination + Link headers
-- [ ] Data separated by gpt_id; collections are first-class
-- [ ] Problem Details errors everywhere
-- [ ] Rate limits enforced with 429/Retry-After
-- [ ] Nightly backups created and rotated
-- [ ] Test suite completes ≤ 10s with per-test timeouts
-- [ ] No file >300 LOC; no one-off inline scripts
-- [ ] Each commit message appended with the required footer
-
+14) References
+- RFC 8288 Link header semantics
+- RFC 9457 Problem Details
+- RFC 6749 OAuth 2.0 and RFC 6750 Bearer token usage
+- OpenAPI 3.1 official specification
+- PostgreSQL JSONB and GIN documentation
+- pg_dump documentation
+- OWASP REST and API security guidance
+- Compose Specification
+- Postgres gen_random_uuid availability via pgcrypto
