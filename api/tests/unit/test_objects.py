@@ -9,16 +9,16 @@ from uuid import UUID, uuid4
 import asyncpg
 import jsonschema
 
-from api.src.models.objects import (
+from src.models.objects import (
     ObjectBase, ObjectCreate, ObjectUpdate, Object, ObjectResponse,
     ObjectListResponse, ObjectRow, ObjectsQueryParams
 )
-from api.src.db.objects import (
+from src.db.objects import (
     validate_object_against_schema, create_object, get_object, list_objects,
     update_object, delete_object, object_exists, get_object_count
 )
-from api.src.pagination import PaginationParams
-from api.src.errors.problem_details import (
+from src.pagination import PaginationParams
+from src.errors.problem_details import (
     NotFoundError, BadRequestError, InternalServerError
 )
 

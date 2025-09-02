@@ -9,16 +9,16 @@ from fastapi import Request, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.testclient import TestClient
 
-from api.src.auth.api_key import (
+from src.auth.api_key import (
     generate_api_key, hash_api_key, verify_api_key, create_api_key,
     validate_api_key, revoke_api_key, list_api_keys_for_gpt
 )
-from api.src.auth.middleware import AuthenticationMiddleware, extract_bearer_token
-from api.src.auth.dependencies import (
+from src.auth.middleware import AuthenticationMiddleware, extract_bearer_token
+from src.auth.dependencies import (
     get_bearer_token, get_current_gpt_id, get_current_gpt_id_from_state,
     require_gpt_access, authenticate_and_get_gpt_id, create_gpt_path_validator
 )
-from api.src.errors.problem_details import UnauthorizedError, ForbiddenError
+from src.errors.problem_details import UnauthorizedError, ForbiddenError
 
 
 def setup_db_pool_mock():
