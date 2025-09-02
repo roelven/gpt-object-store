@@ -1,0 +1,1015 @@
+openapi: 3.1.0
+info:
+  title: GPT Object Store API
+  description: |
+    A backend service for Custom GPTs to persist and retrieve JSON documents.
+    
+    ## Features
+    - Store arbitrary JSON documents with first-class collections per GPT
+    - API key authentication with OAuth 2.0 ready design  
+    - Cursor-based pagination with stable ordering
+    - Problem Details (RFC 9457) error format
+    - Rate limiting with 429 responses and Retry-After headers
+    - PostgreSQL JSONB storage with GIN indexes for performance
+    
+    ## Authentication
+    Use the `Authorization: Bearer <token>` header with your API key.
+    OAuth 2.0 flows are planned for future releases.
+    
+    ## Pagination
+    All list endpoints use cursor-based pagination for stable, efficient traversal.
+    The response includes `next_cursor` and `has_more` fields, plus RFC 8288 Link headers.
+    
+    ## Error Handling
+    Errors follow RFC 9457 Problem Details format with `application/problem+json` content type.
+  version: "1.0.0"
+  contact:
+    name: GPT Object Store Support
+    url: https://github.com/your-org/gpt-object-store
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.yourdomain.com/v1
+    description: Production server
+  - url: http://localhost:8000/v1
+    description: Development server
+
+components:
+  securitySchemes:
+    bearerApiKey:
+      type: http
+      scheme: bearer
+      bearerFormat: APIKey
+      description: API key authentication using Bearer token
+    oauth2:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.yourdomain.com/oauth/authorize
+          tokenUrl: https://auth.yourdomain.com/oauth/token
+          scopes:
+            objects:read: Read objects and collections
+            objects:write: Create, update, and delete objects and collections
+      description: OAuth 2.0 authentication (future implementation)
+
+  schemas:
+    # Core data models
+    Collection:
+      type: object
+      required: [id, gpt_id, name, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Collection UUID
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        gpt_id:
+          type: string
+          description: GPT ID that owns this collection
+          example: "gpt-4-custom"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Collection name
+          example: "notes"
+        schema:
+          type: object
+          nullable: true
+          description: Optional JSON Schema for collection validation
+          example:
+            type: object
+            properties:
+              title:
+                type: string
+              content:
+                type: string
+              tags:
+                type: array
+                items:
+                  type: string
+            required: [title, content]
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+          example: "2024-01-01T12:00:00Z"
+    
+    CollectionCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Collection name
+          example: "notes"
+        schema:
+          type: object
+          nullable: true
+          description: Optional JSON Schema for collection validation
+          example:
+            type: object
+            properties:
+              title:
+                type: string
+              content:
+                type: string
+              tags:
+                type: array
+                items:
+                  type: string
+            required: [title, content]
+    
+    CollectionUpdate:
+      type: object
+      properties:
+        schema:
+          type: object
+          nullable: true
+          description: Updated JSON Schema for collection validation
+          example:
+            type: object
+            properties:
+              title:
+                type: string
+              content:
+                type: string
+              tags:
+                type: array
+                items:
+                  type: string
+              priority:
+                type: string
+                enum: [low, medium, high]
+            required: [title, content]
+    
+    CollectionListResponse:
+      type: object
+      required: [collections, has_more]
+      properties:
+        collections:
+          type: array
+          items:
+            $ref: '#/components/schemas/Collection'
+          description: List of collections
+        next_cursor:
+          type: string
+          nullable: true
+          description: Cursor for next page (null if no more pages)
+          example: "eyJjcmVhdGVkX2F0IjoiMjAyNC0wMS0wMVQxMjowMDowMFoiLCJpZCI6IjU1MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMCJ9"
+        has_more:
+          type: boolean
+          description: Whether more collections are available
+          example: false
+    
+    Object:
+      type: object
+      required: [id, gpt_id, collection, body, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Object UUID
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        gpt_id:
+          type: string
+          description: GPT ID that owns this object
+          example: "gpt-4-custom"
+        collection:
+          type: string
+          description: Collection name this object belongs to
+          example: "notes"
+        body:
+          type: object
+          description: Object JSON data
+          example:
+            title: "Meeting Notes"
+            content: "Important meeting notes from today"
+            tags: ["work", "meetings"]
+            attendees: ["Alice", "Bob"]
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+          example: "2024-01-01T12:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: "2024-01-01T12:30:00Z"
+    
+    ObjectCreate:
+      type: object
+      required: [body]
+      properties:
+        body:
+          type: object
+          description: Object JSON data
+          example:
+            title: "My First Note"
+            content: "This is the content of my note"
+            tags: ["personal", "ideas"]
+            priority: "medium"
+    
+    ObjectUpdate:
+      type: object
+      properties:
+        body:
+          type: object
+          nullable: true
+          description: Updated object JSON data (partial or complete)
+          example:
+            priority: "high"
+            tags: ["work", "urgent"]
+    
+    ObjectListResponse:
+      type: object
+      required: [objects, has_more]
+      properties:
+        objects:
+          type: array
+          items:
+            $ref: '#/components/schemas/Object'
+          description: List of objects
+        next_cursor:
+          type: string
+          nullable: true
+          description: Cursor for next page (null if no more pages)
+          example: "eyJjcmVhdGVkX2F0IjoiMjAyNC0wMS0wMVQxMTozMDowMFoiLCJpZCI6IjY2MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMSJ9"
+        has_more:
+          type: boolean
+          description: Whether more objects are available
+          example: true
+    
+    # Error models (RFC 9457 Problem Details)
+    ProblemDetail:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: A URI reference that identifies the problem type
+          default: "about:blank"
+          example: "about:blank"
+        title:
+          type: string
+          description: A short, human-readable summary of the problem type
+          example: "Bad Request"
+        status:
+          type: integer
+          description: The HTTP status code
+          example: 400
+        detail:
+          type: string
+          description: A human-readable explanation specific to this occurrence
+          example: "The 'limit' parameter must be between 1 and 200"
+        instance:
+          type: string
+          format: uri
+          description: A URI reference that identifies the specific occurrence
+          example: "/v1/gpts/gpt-4-custom/collections"
+      additionalProperties: true
+    
+    # Health check models
+    HealthStatus:
+      type: object
+      required: [status, service, version]
+      properties:
+        status:
+          type: string
+          enum: [healthy]
+          description: Service health status
+          example: "healthy"
+        service:
+          type: string
+          description: Service name
+          example: "GPT Object Store API"
+        version:
+          type: string
+          description: Service version
+          example: "1.0.0"
+        database:
+          type: string
+          description: Database connection status
+          example: "connected"
+    
+    ReadinessStatus:
+      type: object
+      required: [status, service]
+      properties:
+        status:
+          type: string
+          enum: [ready]
+          description: Service readiness status
+          example: "ready"
+        service:
+          type: string
+          description: Service name
+          example: "GPT Object Store API"
+        database_connections:
+          type: integer
+          description: Number of active database connections
+          example: 5
+    
+    LivenessStatus:
+      type: object
+      required: [status, service]
+      properties:
+        status:
+          type: string
+          enum: [alive]
+          description: Service liveness status
+          example: "alive"
+        service:
+          type: string
+          description: Service name
+          example: "GPT Object Store API"
+    
+    RootInfo:
+      type: object
+      required: [service, version, docs, health]
+      properties:
+        service:
+          type: string
+          description: Service name
+          example: "GPT Object Store API"
+        version:
+          type: string
+          description: Service version
+          example: "1.0.0"
+        docs:
+          type: string
+          description: Documentation URL path
+          example: "/docs"
+        health:
+          type: string
+          description: Health check URL path
+          example: "/health"
+
+  parameters:
+    GptId:
+      name: gpt_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[a-zA-Z0-9-_.]+$'
+        minLength: 1
+        maxLength: 100
+      description: GPT identifier
+      example: "gpt-4-custom"
+    
+    CollectionName:
+      name: collection_name
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 100
+      description: Collection name
+      example: "notes"
+    
+    ObjectId:
+      name: object_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Object UUID
+      example: "550e8400-e29b-41d4-a716-446655440000"
+    
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+      description: Number of items per page
+      example: 50
+    
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema:
+        type: string
+        nullable: true
+      description: Cursor for pagination
+      example: "eyJjcmVhdGVkX2F0IjoiMjAyNC0wMS0wMVQxMjowMDowMFoiLCJpZCI6IjU1MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMCJ9"
+    
+    Order:
+      name: order
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: desc
+      description: Sort order
+      example: "desc"
+
+  responses:
+    # Success responses
+    Collection:
+      description: Collection retrieved successfully
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Collection'
+    
+    CollectionList:
+      description: Collections retrieved successfully
+      headers:
+        Link:
+          description: RFC 8288 Link header for pagination
+          schema:
+            type: string
+          example: '</v1/gpts/gpt-4-custom/collections?limit=50&order=desc&cursor=eyJ0aW1lc3RhbXAiOiIyMDI0LTAxLTAxVDEyOjAwOjAwWiIsImlkIjoiNTUwZTg0MDAtZTI5Yi00MWQ0LWE3MTYtNDQ2NjU1NDQwMDAwIn0%3D>; rel="next"'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CollectionListResponse'
+    
+    Object:
+      description: Object retrieved successfully
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Object'
+    
+    ObjectList:
+      description: Objects retrieved successfully
+      headers:
+        Link:
+          description: RFC 8288 Link header for pagination
+          schema:
+            type: string
+          example: '</v1/gpts/gpt-4-custom/collections/notes/objects?limit=50&order=desc&cursor=eyJ0aW1lc3RhbXAiOiIyMDI0LTAxLTAxVDEyOjAwOjAwWiIsImlkIjoiNTUwZTg0MDAtZTI5Yi00MWQ0LWE3MTYtNDQ2NjU1NDQwMDAwIn0%3D>; rel="next"'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ObjectListResponse'
+    
+    NoContent:
+      description: Successfully deleted, no content
+    
+    # Error responses
+    BadRequest:
+      description: Bad Request - Invalid request parameters or data
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: "about:blank"
+            title: "Bad Request"
+            status: 400
+            detail: "The 'limit' parameter must be between 1 and 200"
+            instance: "/v1/gpts/gpt-4-custom/collections"
+    
+    Unauthorized:
+      description: Unauthorized - Authentication required
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: "about:blank"
+            title: "Unauthorized"
+            status: 401
+            detail: "Authentication required"
+            instance: "/v1/gpts/gpt-4-custom/collections"
+    
+    Forbidden:
+      description: Forbidden - Access denied
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: "about:blank"
+            title: "Forbidden"
+            status: 403
+            detail: "Access denied"
+            instance: "/v1/gpts/gpt-4-custom/collections"
+    
+    NotFound:
+      description: Not Found - Resource does not exist
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: "about:blank"
+            title: "Not Found"
+            status: 404
+            detail: "Collection 'notes' not found"
+            instance: "/v1/gpts/gpt-4-custom/collections/notes"
+    
+    Conflict:
+      description: Conflict - Resource constraint violation
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: "about:blank"
+            title: "Conflict"
+            status: 409
+            detail: "Collection name already exists"
+            instance: "/v1/gpts/gpt-4-custom/collections"
+    
+    UnprocessableEntity:
+      description: Unprocessable Entity - Validation error
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: "about:blank"
+            title: "Unprocessable Entity"
+            status: 422
+            detail: "JSON Schema validation failed"
+            instance: "/v1/gpts/gpt-4-custom/collections/notes/objects"
+    
+    TooManyRequests:
+      description: Too Many Requests - Rate limit exceeded
+      headers:
+        Retry-After:
+          description: Number of seconds to wait before retrying
+          schema:
+            type: integer
+          example: 60
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: "about:blank"
+            title: "Too Many Requests"
+            status: 429
+            detail: "Rate limit exceeded"
+            instance: "/v1/gpts/gpt-4-custom/collections"
+            retry_after: 60
+    
+    InternalServerError:
+      description: Internal Server Error
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: "about:blank"
+            title: "Internal Server Error"
+            status: 500
+            detail: "Internal server error"
+            instance: "/v1/gpts/gpt-4-custom/collections"
+    
+    ServiceUnavailable:
+      description: Service Unavailable - Service temporarily unavailable
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: "about:blank"
+            title: "Service Unavailable"
+            status: 503
+            detail: "Database connection failed"
+            instance: "/v1/health"
+            database_error: "Connection timeout"
+
+security:
+  - bearerApiKey: []
+
+paths:
+  # Root endpoint
+  /:
+    get:
+      summary: API information
+      description: Root endpoint with API information and navigation links
+      operationId: getRoot
+      tags: [Root]
+      security: []
+      responses:
+        '200':
+          description: API information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RootInfo'
+
+  # Health endpoints
+  /health:
+    get:
+      summary: Health check
+      description: Health check endpoint with database connectivity test
+      operationId: healthCheck
+      tags: [Health]
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /ready:
+    get:
+      summary: Readiness check
+      description: Kubernetes-style readiness check endpoint
+      operationId: readinessCheck
+      tags: [Health]
+      security: []
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessStatus'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /live:
+    get:
+      summary: Liveness check
+      description: Kubernetes-style liveness check endpoint
+      operationId: livenessCheck
+      tags: [Health]
+      security: []
+      responses:
+        '200':
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LivenessStatus'
+
+  # Collections endpoints
+  /gpts/{gpt_id}/collections:
+    parameters:
+      - $ref: '#/components/parameters/GptId'
+    
+    post:
+      summary: Create or update a collection
+      description: |
+        Create a new collection or update an existing one with optional JSON Schema validation.
+        This endpoint supports upsert behavior - if a collection with the same name already exists,
+        it will be updated with the new schema.
+      operationId: createOrUpdateCollection
+      tags: [Collections]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CollectionCreate'
+            examples:
+              basic:
+                summary: Basic collection
+                value:
+                  name: "notes"
+              with_schema:
+                summary: Collection with JSON Schema
+                value:
+                  name: "notes"
+                  schema:
+                    type: object
+                    properties:
+                      title:
+                        type: string
+                      content:
+                        type: string
+                      tags:
+                        type: array
+                        items:
+                          type: string
+                    required: [title, content]
+      responses:
+        '201':
+          description: Collection created or updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Collection'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    
+    get:
+      summary: List collections
+      description: |
+        List collections for a GPT with cursor-based pagination and stable ordering.
+        Collections are sorted by creation time (descending by default) with UUID as a tiebreaker.
+      operationId: listCollections
+      tags: [Collections]
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Order'
+      responses:
+        '200':
+          $ref: '#/components/responses/CollectionList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /gpts/{gpt_id}/collections/{collection_name}:
+    parameters:
+      - $ref: '#/components/parameters/GptId'
+      - $ref: '#/components/parameters/CollectionName'
+    
+    get:
+      summary: Get a collection
+      description: Retrieve a specific collection by name
+      operationId: getCollection
+      tags: [Collections]
+      responses:
+        '200':
+          $ref: '#/components/responses/Collection'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    
+    patch:
+      summary: Update a collection
+      description: Update a collection's JSON Schema
+      operationId: updateCollection
+      tags: [Collections]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CollectionUpdate'
+            example:
+              schema:
+                type: object
+                properties:
+                  title:
+                    type: string
+                  content:
+                    type: string
+                  tags:
+                    type: array
+                    items:
+                      type: string
+                  priority:
+                    type: string
+                    enum: [low, medium, high]
+                required: [title, content]
+      responses:
+        '200':
+          $ref: '#/components/responses/Collection'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    
+    delete:
+      summary: Delete a collection
+      description: Delete a collection and all its objects
+      operationId: deleteCollection
+      tags: [Collections]
+      responses:
+        '204':
+          $ref: '#/components/responses/NoContent'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # Collection objects endpoints
+  /gpts/{gpt_id}/collections/{collection_name}/objects:
+    parameters:
+      - $ref: '#/components/parameters/GptId'
+      - $ref: '#/components/parameters/CollectionName'
+    
+    post:
+      summary: Create an object
+      description: |
+        Create a new object in a collection with optional JSON Schema validation.
+        The object will be validated against the collection's JSON Schema if one is defined.
+      operationId: createObject
+      tags: [Objects]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObjectCreate'
+            examples:
+              note:
+                summary: Note object
+                value:
+                  body:
+                    title: "My First Note"
+                    content: "This is the content of my note"
+                    tags: ["personal", "ideas"]
+                    priority: "medium"
+              task:
+                summary: Task object
+                value:
+                  body:
+                    name: "Complete project"
+                    completed: false
+                    due_date: "2024-01-15"
+                    assignee: "Alice"
+      responses:
+        '201':
+          description: Object created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Object'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    
+    get:
+      summary: List objects
+      description: |
+        List objects in a collection with cursor-based pagination and stable ordering.
+        Objects are sorted by creation time (descending by default) with UUID as a tiebreaker.
+        This ensures consistent pagination even when objects have the same creation timestamp.
+      operationId: listObjects
+      tags: [Objects]
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Order'
+      responses:
+        '200':
+          $ref: '#/components/responses/ObjectList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # Direct object endpoints
+  /objects/{object_id}:
+    parameters:
+      - $ref: '#/components/parameters/ObjectId'
+    
+    get:
+      summary: Get an object
+      description: |
+        Retrieve a specific object by ID with GPT ownership validation.
+        The object must belong to the authenticated GPT.
+      operationId: getObject
+      tags: [Objects]
+      responses:
+        '200':
+          $ref: '#/components/responses/Object'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    
+    patch:
+      summary: Update an object
+      description: |
+        Partially update an object with JSON Schema validation and automatic updated_at timestamp.
+        This endpoint supports partial updates - you can update just specific fields in the object's
+        body while preserving other fields. The updated object will be validated against the
+        collection's JSON Schema if one is defined.
+      operationId: updateObject
+      tags: [Objects]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObjectUpdate'
+            example:
+              body:
+                priority: "high"
+                tags: ["work", "urgent"]
+      responses:
+        '200':
+          $ref: '#/components/responses/Object'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    
+    delete:
+      summary: Delete an object
+      description: |
+        Delete an object with GPT ownership validation.
+        The object must belong to the authenticated GPT. Once deleted, the object cannot be recovered.
+      operationId: deleteObject
+      tags: [Objects]
+      responses:
+        '204':
+          $ref: '#/components/responses/NoContent'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+tags:
+  - name: Root
+    description: API information and navigation
+  - name: Health
+    description: Health, readiness, and liveness checks
+  - name: Collections
+    description: Collection management operations
+  - name: Objects
+    description: Object storage and retrieval operations
+
+externalDocs:
+  description: Find more information about the GPT Object Store
+  url: https://github.com/your-org/gpt-object-store

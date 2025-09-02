@@ -2,9 +2,12 @@
 
 import logging
 import asyncio
+import os
+from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import Dict, Any
 
+import yaml
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -23,6 +26,21 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+
+def load_openapi_spec() -> Dict[str, Any]:
+    """Load the custom OpenAPI specification from YAML file."""
+    openapi_file = Path(__file__).parent.parent / "openapi" / "gpt-object-store.yaml"
+    
+    try:
+        with open(openapi_file, 'r') as f:
+            return yaml.safe_load(f)
+    except FileNotFoundError:
+        logger.warning(f"OpenAPI spec file not found at {openapi_file}, using auto-generated spec")
+        return {}
+    except yaml.YAMLError as e:
+        logger.warning(f"Failed to parse OpenAPI spec: {e}, using auto-generated spec")
+        return {}
 
 
 @asynccontextmanager
@@ -65,15 +83,36 @@ def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     settings = get_settings()
     
-    app = FastAPI(
-        title="GPT Object Store API",
-        description="A backend service for Custom GPTs to persist and retrieve JSON documents",
-        version="1.0.0",
-        docs_url="/docs",
-        redoc_url="/redoc",
-        openapi_url="/openapi.json",
-        lifespan=lifespan
-    )
+    # Load custom OpenAPI specification
+    custom_openapi = load_openapi_spec()
+    
+    # Create app with custom OpenAPI if available, otherwise use defaults
+    if custom_openapi:
+        app = FastAPI(
+            title=custom_openapi.get("info", {}).get("title", "GPT Object Store API"),
+            description=custom_openapi.get("info", {}).get("description", "A backend service for Custom GPTs to persist and retrieve JSON documents"),
+            version=custom_openapi.get("info", {}).get("version", "1.0.0"),
+            docs_url="/docs",
+            redoc_url="/redoc",
+            openapi_url="/openapi.json",
+            lifespan=lifespan
+        )
+        
+        # Override the openapi method to return our custom spec
+        def get_custom_openapi():
+            return custom_openapi
+        
+        app.openapi = get_custom_openapi
+    else:
+        app = FastAPI(
+            title="GPT Object Store API",
+            description="A backend service for Custom GPTs to persist and retrieve JSON documents",
+            version="1.0.0",
+            docs_url="/docs",
+            redoc_url="/redoc",
+            openapi_url="/openapi.json",
+            lifespan=lifespan
+        )
     
     # Add rate limiting middleware (before CORS to limit all requests)
     app.add_middleware(RateLimitMiddleware)
