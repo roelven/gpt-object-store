@@ -31,6 +31,7 @@ class TestSettings:
         assert settings.log_level == "INFO"
         assert settings.default_page_size == 50
         assert settings.max_page_size == 200
+        assert settings.api_url == "http://localhost:8000"
     
     def test_environment_override(self):
         """Test that environment variables override defaults."""
@@ -42,7 +43,8 @@ class TestSettings:
             "DATABASE_URL": "postgresql://test:test@testhost:5432/testdb",
             "LOG_LEVEL": "DEBUG",
             "DEFAULT_PAGE_SIZE": "25",
-            "MAX_PAGE_SIZE": "100"
+            "MAX_PAGE_SIZE": "100",
+            "API_URL": "https://api.example.com"
         }
         
         with patch.dict(os.environ, env_vars):
@@ -56,6 +58,7 @@ class TestSettings:
             assert settings.log_level == "DEBUG"
             assert settings.default_page_size == 25
             assert settings.max_page_size == 100
+            assert settings.api_url == "https://api.example.com"
     
     def test_cors_configuration_via_json(self):
         """Test CORS configuration via JSON arrays."""
@@ -94,3 +97,60 @@ class TestSettings:
         
         # Should return the same instance due to module-level singleton
         assert settings1 is settings2
+    
+    def test_api_url_field_exists(self):
+        """Test that Settings class has api_url field (regression test)."""
+        settings = Settings()
+        
+        # Should have api_url attribute - this was missing and caused AttributeError
+        assert hasattr(settings, 'api_url'), "Settings must have api_url field"
+        
+        # Should not raise AttributeError when accessed
+        try:
+            api_url = settings.api_url
+            assert isinstance(api_url, str), "api_url should be a string"
+        except AttributeError as e:
+            pytest.fail(f"Settings.api_url should not raise AttributeError: {e}")
+    
+    def test_api_url_environment_mapping(self):
+        """Test that API_URL environment variable maps to api_url field."""
+        test_urls = [
+            "https://api.production.com",
+            "https://gpt-backend.w22.io",
+            "http://localhost:3000",
+            "https://api.staging.example.com"
+        ]
+        
+        for test_url in test_urls:
+            with patch.dict(os.environ, {"API_URL": test_url}):
+                settings = Settings()
+                assert settings.api_url == test_url, f"API_URL={test_url} should map to api_url field"
+    
+    def test_api_url_default_value(self):
+        """Test api_url has reasonable default value."""
+        # Ensure no API_URL env var interferes
+        with patch.dict(os.environ, {}, clear=True):
+            settings = Settings()
+            
+            # Default should be localhost for development
+            assert settings.api_url == "http://localhost:8000"
+            assert settings.api_url.startswith("http"), "Default api_url should be a valid URL"
+    
+    def test_settings_regression_openapi_server_url(self):
+        """Test regression: Settings.api_url is accessible for OpenAPI server URL generation."""
+        # This test ensures the AttributeError that caused OpenAPI /openapi.json to fail is fixed
+        
+        with patch.dict(os.environ, {"API_URL": "https://test.example.com"}):
+            settings = Settings()
+            
+            # This should work without AttributeError (the original bug)
+            server_url = settings.api_url
+            assert server_url == "https://test.example.com"
+            
+            # Simulate the OpenAPI spec generation that was failing
+            openapi_server_config = {
+                "url": settings.api_url,
+                "description": "Production server"
+            }
+            
+            assert openapi_server_config["url"] == "https://test.example.com"

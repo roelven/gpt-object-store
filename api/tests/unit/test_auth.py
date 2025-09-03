@@ -298,6 +298,60 @@ class TestAuthenticationMiddleware:
         # We don't need to check the state since middleware returns early
     
     @pytest.mark.asyncio
+    async def test_middleware_skip_paths_v1_variants(self):
+        """Test middleware skips authentication for v1-prefixed health endpoints."""
+        from fastapi import FastAPI
+        
+        app = FastAPI()
+        middleware = AuthenticationMiddleware(app)
+        
+        # Test all v1-prefixed skip paths
+        v1_skip_paths = ["/v1/health", "/v1/ready", "/v1/live", "/v1/"]
+        
+        for path in v1_skip_paths:
+            # Mock request
+            request = MagicMock()
+            request.url.path = path
+            
+            # Mock call_next
+            call_next = AsyncMock()
+            call_next.return_value = f"response_for_{path}"
+            
+            result = await middleware.dispatch(request, call_next)
+            
+            assert result == f"response_for_{path}"
+            call_next.assert_called_with(request)
+            call_next.reset_mock()
+    
+    @pytest.mark.asyncio 
+    async def test_middleware_all_skip_paths_comprehensive(self):
+        """Test middleware skips authentication for all configured skip paths."""
+        from fastapi import FastAPI
+        
+        app = FastAPI()
+        # Use the same skip paths as configured in main.py
+        skip_paths = [
+            "/health", "/ready", "/live", "/", "/docs", "/redoc", "/openapi.json",
+            "/v1/health", "/v1/ready", "/v1/live", "/v1/"
+        ]
+        middleware = AuthenticationMiddleware(app, skip_paths=skip_paths)
+        
+        for path in skip_paths:
+            # Mock request
+            request = MagicMock()
+            request.url.path = path
+            
+            # Mock call_next
+            call_next = AsyncMock()
+            call_next.return_value = f"response"
+            
+            result = await middleware.dispatch(request, call_next)
+            
+            assert result == "response", f"Skip path {path} should not require authentication"
+            call_next.assert_called_with(request)
+            call_next.reset_mock()
+    
+    @pytest.mark.asyncio
     async def test_middleware_missing_auth_header(self):
         """Test middleware handles missing Authorization header."""
         from fastapi import FastAPI

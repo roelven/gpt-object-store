@@ -76,12 +76,9 @@ class TestOpenAPISpecification:
         assert api_key_scheme["scheme"] == "bearer"
         assert api_key_scheme["bearerFormat"] == "APIKey"
         
-        # Check OAuth2 security scheme (for future)
-        assert "oauth2" in security_schemes, "Must have oauth2 security scheme"
-        oauth_scheme = security_schemes["oauth2"]
-        assert oauth_scheme["type"] == "oauth2"
-        assert "flows" in oauth_scheme
-        assert "authorizationCode" in oauth_scheme["flows"]
+        # OAuth2 security scheme removed for GPT Actions compatibility
+        # GPT Actions require single security scheme only
+        assert "oauth2" not in security_schemes, "oauth2 security scheme should be removed for GPT Actions compatibility"
     
     def test_required_schemas(self):
         """Test that all required schemas are defined."""
@@ -105,9 +102,9 @@ class TestOpenAPISpecification:
         
         paths = spec["paths"]
         
-        # Collection endpoints
-        collection_base = "/gpts/{gpt_id}/collections"
-        collection_item = "/gpts/{gpt_id}/collections/{collection_name}"
+        # Collection endpoints (updated for v1 prefix)
+        collection_base = "/v1/gpts/{gpt_id}/collections"
+        collection_item = "/v1/gpts/{gpt_id}/collections/{collection_name}"
         
         assert collection_base in paths, f"Path {collection_base} must be defined"
         assert collection_item in paths, f"Path {collection_item} must be defined"
@@ -129,9 +126,9 @@ class TestOpenAPISpecification:
         
         paths = spec["paths"]
         
-        # Object endpoints
-        collection_objects = "/gpts/{gpt_id}/collections/{collection_name}/objects"
-        direct_object = "/objects/{object_id}"
+        # Object endpoints (updated for v1 prefix)
+        collection_objects = "/v1/gpts/{gpt_id}/collections/{collection_name}/objects"
+        direct_object = "/v1/objects/{object_id}"
         
         assert collection_objects in paths, f"Path {collection_objects} must be defined"
         assert direct_object in paths, f"Path {direct_object} must be defined"
@@ -212,12 +209,12 @@ class TestOpenAPISpecification:
         assert "components" in spec
         assert "securitySchemes" in spec["components"]
         assert "bearerApiKey" in spec["components"]["securitySchemes"]
-        assert "oauth2" in spec["components"]["securitySchemes"]
+        # oauth2 removed for GPT Actions compatibility
         
-        # Verify paths are present
+        # Verify paths are present (updated for v1 prefix)
         assert "paths" in spec
-        assert "/gpts/{gpt_id}/collections" in spec["paths"]
-        assert "/objects/{object_id}" in spec["paths"]
+        assert "/v1/gpts/{gpt_id}/collections" in spec["paths"]
+        assert "/v1/objects/{object_id}" in spec["paths"]
     
     def test_openapi_spec_has_correct_structure_for_gpt_actions(self):
         """Test that the OpenAPI spec is structured correctly for GPT Actions."""
@@ -240,6 +237,27 @@ class TestOpenAPISpecification:
         for server in spec["servers"]:
             assert "url" in server, "Each server must have a URL"
             assert len(server["url"]) > 0, "Server URL must not be empty"
+    
+    def test_server_url_structure_for_gpt_actions(self):
+        """Test that server URL is structured correctly for GPT Actions."""
+        spec = load_openapi_spec()
+        
+        # Check servers configuration
+        assert "servers" in spec, "Servers must be defined"
+        assert len(spec["servers"]) == 1, "Should have exactly one server for GPT Actions compatibility"
+        
+        server = spec["servers"][0]
+        server_url = server["url"]
+        
+        # Server URL should NOT include /v1 (paths include it instead)
+        assert not server_url.endswith("/v1"), \
+            "Server URL should not end with /v1 - paths should include the version prefix instead"
+        assert "/v1" not in server_url, \
+            "Server URL should not contain /v1 anywhere - version prefix moved to individual paths"
+        
+        # Should be a valid URL format
+        assert server_url.startswith(("http://", "https://")), \
+            "Server URL should start with http:// or https://"
     
     def test_operation_ids_unique(self):
         """Test that all operation IDs are unique across the specification."""
@@ -271,10 +289,12 @@ class TestOpenAPISpecification:
         assert "components" in spec
         assert "securitySchemes" in spec["components"]
         
-        # Should support both API key and OAuth for flexibility
+        # Should have API key security scheme for GPT Actions (oauth2 removed for compatibility)
         security_schemes = spec["components"]["securitySchemes"]
-        assert "bearerApiKey" in security_schemes or "oauth2" in security_schemes, \
-            "Must have either API key or OAuth security scheme for GPT Actions"
+        assert "bearerApiKey" in security_schemes, \
+            "Must have bearerApiKey security scheme for GPT Actions"
+        assert "oauth2" not in security_schemes, \
+            "oauth2 security scheme should be removed for GPT Actions single-scheme requirement"
         
         # All protected endpoints should specify security requirements
         paths = spec["paths"]

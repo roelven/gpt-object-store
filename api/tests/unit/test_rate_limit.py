@@ -259,6 +259,58 @@ class TestRateLimitMiddleware:
         result = await self.middleware.dispatch(request, mock_call_next)
         assert result == "response"
     
+    @pytest.mark.asyncio
+    async def test_skip_paths_v1_variants(self):
+        """Test that middleware skips v1-prefixed health endpoints."""
+        v1_skip_paths = ["/v1/health", "/v1/ready", "/v1/live", "/v1/"]
+        
+        async def mock_call_next(req):
+            return f"response_for_{req.url.path}"
+        
+        for path in v1_skip_paths:
+            request = Mock(spec=Request)
+            request.url.path = path
+            
+            result = await self.middleware.dispatch(request, mock_call_next)
+            assert result == f"response_for_{path}", f"Path {path} should skip rate limiting"
+    
+    @pytest.mark.asyncio
+    async def test_skip_paths_comprehensive(self):
+        """Test that middleware skips all configured skip paths."""
+        # Use the same skip paths as configured in main.py
+        skip_paths = [
+            "/health", "/ready", "/live", "/", "/docs", "/redoc", "/openapi.json",
+            "/v1/health", "/v1/ready", "/v1/live", "/v1/"
+        ]
+        
+        # Create middleware with explicit skip paths
+        from src.rate_limit.middleware import RateLimitMiddleware
+        middleware = RateLimitMiddleware(None, skip_paths=skip_paths)
+        
+        async def mock_call_next(req):
+            return "response"
+        
+        for path in skip_paths:
+            request = Mock(spec=Request)
+            request.url.path = path
+            
+            result = await middleware.dispatch(request, mock_call_next)
+            assert result == "response", f"Path {path} should skip rate limiting"
+    
+    def test_skip_paths_consistency_with_auth_middleware(self):
+        """Test that rate limiting skip paths match auth middleware skip paths."""
+        # Import both middleware classes to compare their default skip paths
+        from src.rate_limit.middleware import RateLimitMiddleware
+        from src.auth.middleware import AuthenticationMiddleware
+        
+        # Create instances and check their default skip paths
+        rate_limit_middleware = RateLimitMiddleware(None)
+        auth_middleware = AuthenticationMiddleware(None)
+        
+        # Both should have the same default skip paths
+        assert rate_limit_middleware.skip_paths == auth_middleware.skip_paths, \
+            "Rate limiting and authentication middleware should have identical skip paths"
+    
     def test_get_client_ip_forwarded(self):
         """Test client IP extraction from X-Forwarded-For header."""
         request = Mock(spec=Request)
