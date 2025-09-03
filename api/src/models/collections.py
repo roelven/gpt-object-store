@@ -160,10 +160,6 @@ class CollectionRow(BaseModel):
     
     def to_collection(self) -> Collection:
         """Convert to public Collection model."""
-        return Collection(
-            id=self.id,
-            gpt_id=self.gpt_id,
-            name=self.name,
-            json_schema=self.json_schema,
-            created_at=self.created_at
-        )
+        # Use model_dump and model_validate to preserve field aliases
+        data = self.model_dump(by_alias=True)
+        return Collection.model_validate(data)

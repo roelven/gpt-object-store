@@ -86,7 +86,7 @@ async def create_or_update_collection(
     collection = await create_collection(validated_gpt_id, collection_data)
     
     logger.info(f"Successfully created/updated collection {collection.id}")
-    return CollectionResponse.model_validate(collection.model_dump())
+    return CollectionResponse.model_validate(collection.model_dump(by_alias=True))
 
 
 @router.get(
@@ -196,7 +196,7 @@ async def get_collection_by_name(
     collection = await get_collection(validated_gpt_id, collection_name)
     
     logger.info(f"Successfully retrieved collection {collection.id}")
-    return CollectionResponse.model_validate(collection.model_dump())
+    return CollectionResponse.model_validate(collection.model_dump(by_alias=True))
 
 
 @router.patch(
@@ -234,7 +234,7 @@ async def update_collection_schema(
     collection = await update_collection(validated_gpt_id, collection_name, update_data)
     
     logger.info(f"Successfully updated collection {collection.id}")
-    return CollectionResponse.model_validate(collection.model_dump())
+    return CollectionResponse.model_validate(collection.model_dump(by_alias=True))
 
 
 @router.delete(

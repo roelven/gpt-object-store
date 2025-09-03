@@ -177,6 +177,9 @@ def create_gpt_path_validator():
             ForbiddenError: If path gpt_id doesn't match authenticated gpt_id
         """
         if gpt_id != current_gpt_id:
+            # Add detailed logging for debugging character differences
+            logger.error(f"GPT ID mismatch - Path: '{gpt_id}' (len={len(gpt_id)}, bytes={gpt_id.encode('utf-8')}) vs Authenticated: '{current_gpt_id}' (len={len(current_gpt_id)}, bytes={current_gpt_id.encode('utf-8')})")
+            
             raise ForbiddenError(
                 f"Path GPT ID '{gpt_id}' does not match authenticated GPT ID '{current_gpt_id}'"
             )

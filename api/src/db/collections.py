@@ -70,13 +70,24 @@ async def create_collection(
             
             # Convert row to dict and handle JSONB schema parsing
             row_dict = dict(row)
+            logger.info(f"Raw row_dict schema: {row_dict.get('schema')}, type: {type(row_dict.get('schema'))}")
+            
             if row_dict.get('schema') and isinstance(row_dict['schema'], str):
+                logger.info(f"Parsing JSON schema string: {row_dict['schema']}")
                 row_dict['schema'] = json.loads(row_dict['schema'])
+            elif row_dict.get('schema'):
+                logger.info(f"Schema is already parsed: {row_dict['schema']}")
+            else:
+                logger.info("No schema found in row")
             
             collection_row = CollectionRow.model_validate(row_dict)
+            logger.info(f"CollectionRow json_schema: {collection_row.json_schema}")
+            
+            collection = collection_row.to_collection()
+            logger.info(f"Collection json_schema: {collection.json_schema}")
             logger.info(f"Created/updated collection {collection_row.id} for GPT {gpt_id}")
             
-            return collection_row.to_collection()
+            return collection
             
     except asyncpg.UniqueViolationError as e:
         logger.error(f"Unique constraint violation creating collection: {e}")

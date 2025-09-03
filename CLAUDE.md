@@ -379,3 +379,4 @@ LIMIT $5;
 - OWASP REST and API security guidance
 - Compose Specification
 - Postgres gen_random_uuid availability via pgcrypto
+- this host does not run the production app. Calls to the production server do not arrive on this host. You need to test against localhost.
