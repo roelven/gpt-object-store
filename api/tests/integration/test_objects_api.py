@@ -94,6 +94,54 @@ class TestObjectsAPIIntegration:
         
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
     
+    def test_create_object_empty_request_like_gpt_actions(self, client, auth_headers):
+        """Test object creation with empty request body (like GPT Actions bug).
+        
+        This test specifically validates the issue where GPT Actions was sending
+        empty {} objects instead of the required {"body": {...}} structure.
+        """
+        # Test the exact problematic case from the user report
+        response = client.post(
+            "/gpts/gpt-4-test/collections/notes/objects",
+            headers=auth_headers,
+            json={}  # Empty object - this is what GPT Actions was sending
+        )
+        
+        # Should return 422 with validation error about missing 'body' field
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.headers["content-type"] == "application/problem+json"
+        
+        error_data = response.json()
+        assert "Field required" in error_data.get("detail", "")
+        assert "body" in error_data.get("detail", "").lower()
+        
+        # Test the correct format that should work
+        with patch('api.src.routes.objects.create_object') as mock_create:
+            mock_create.return_value = Object(
+                id=uuid4(),
+                gpt_id="gpt-4-test",
+                collection="notes",
+                body={"title": "Test Entry", "content": "Test content"},
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc)
+            )
+            
+            response = client.post(
+                "/gpts/gpt-4-test/collections/notes/objects",
+                headers=auth_headers,
+                json={
+                    "body": {
+                        "title": "Test Entry",
+                        "content": "Test content"
+                    }
+                }
+            )
+            
+            assert response.status_code == status.HTTP_201_CREATED
+            data = response.json()
+            assert data["body"]["title"] == "Test Entry"
+            assert data["body"]["content"] == "Test content"
+    
     def test_create_object_validation_error(self, client, auth_headers):
         """Test object creation with schema validation error."""
         from api.src.errors.problem_details import BadRequestError
@@ -423,9 +471,8 @@ class TestObjectsAPIIntegration:
         # Test with invalid JSON
         response = client.post(
             "/gpts/gpt-4-test/collections/notes/objects",
-            headers=auth_headers,
-            data="invalid json",
-            headers={**auth_headers, "Content-Type": "application/json"}
+            headers={**auth_headers, "Content-Type": "application/json"},
+            data="invalid json"
         )
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
         

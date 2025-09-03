@@ -198,11 +198,6 @@ components:
           type: object
           description: Object JSON data - all your actual data goes inside this body field
           additionalProperties: true
-          example:
-            title: "My First Note"
-            content: "This is the content of my note"
-            tags: ["personal", "ideas"]
-            priority: "medium"
       example:
         body:
           title: "My First Note"
@@ -217,9 +212,10 @@ components:
           type: object
           nullable: true
           description: Updated object JSON data (partial or complete)
-          example:
-            priority: "high"
-            tags: ["work", "urgent"]
+      example:
+        body:
+          priority: "high"
+          tags: ["work", "urgent"]
     
     ObjectListResponse:
       type: object
