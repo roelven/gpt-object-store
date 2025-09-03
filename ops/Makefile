@@ -83,7 +83,7 @@ create-gpt:
 # Generate API key for a GPT
 create-key:
 	@test -n "$(GPT_ID)" || (echo "Error: GPT_ID is required. Usage: make create-key GPT_ID=my-gpt" && exit 1)
-	@docker compose exec api python -c " \
+	@docker compose exec api python -c "\
 import asyncio; \
 import sys; \
 sys.path.append('/app'); \
@@ -100,8 +100,7 @@ try: \
     print(''); \
 except Exception as e: \
     print(f'Error: {e}'); \
-    sys.exit(1); \
-"
+    sys.exit(1);"
 
 # List API keys for a GPT
 list-keys:

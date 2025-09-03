@@ -25,10 +25,17 @@ class Settings(BaseSettings):
     rate_limits: str = "key:60/m,write:10/m,ip:600/5m"
     
     # CORS settings
-    cors_origins: List[str] = ["*"]
+    cors_origins_raw: str = "*"
     cors_allow_credentials: bool = True
     cors_allow_methods: List[str] = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
     cors_allow_headers: List[str] = ["*"]
+    
+    @property
+    def cors_origins(self) -> List[str]:
+        """Parse CORS origins from comma-separated string."""
+        if self.cors_origins_raw == "*":
+            return ["*"]
+        return [origin.strip() for origin in self.cors_origins_raw.split(",") if origin.strip()]
     
     # Security settings
     api_key_hash_algorithm: str = "sha256"
