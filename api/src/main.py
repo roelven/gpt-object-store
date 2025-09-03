@@ -18,6 +18,7 @@ from .errors import register_exception_handlers, create_problem_response
 from .errors.problem_details import ServiceUnavailableError
 from .rate_limit.middleware import RateLimitMiddleware
 from .auth.middleware import AuthenticationMiddleware
+from .middleware.request_logging import RequestLoggingMiddleware
 from .routes import collections_router
 from .routes.objects import collection_objects_router, objects_router
 
@@ -118,6 +119,9 @@ def create_app() -> FastAPI:
             openapi_url="/openapi.json",
             lifespan=lifespan
         )
+    
+    # Add request logging middleware for debugging (first, so it captures everything)
+    app.add_middleware(RequestLoggingMiddleware)
     
     # Add rate limiting middleware (before CORS to limit all requests)
     # Use same skip paths as auth middleware

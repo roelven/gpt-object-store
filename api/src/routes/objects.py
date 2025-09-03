@@ -80,6 +80,7 @@ async def create_collection_object(
         Created object with generated UUID and timestamps
     """
     logger.info(f"Creating object in collection '{collection_name}' for GPT {validated_gpt_id}")
+    logger.info(f"Request body data: {object_data.model_dump()}")
     
     obj = await create_object(validated_gpt_id, collection_name, object_data)
     

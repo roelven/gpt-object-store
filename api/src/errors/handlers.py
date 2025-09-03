@@ -93,8 +93,13 @@ async def validation_exception_handler(
     exc: RequestValidationError
 ) -> JSONResponse:
     """Handle Pydantic validation errors."""
+    # Log detailed validation errors for debugging
+    logger.info(f"Validation error: {len(exc.errors())} errors")
+    for i, error in enumerate(exc.errors()):
+        logger.info(f"  Error {i+1}: {error}")
+    
     logger.info(
-        f"Validation error: {len(exc.errors())} errors",
+        f"Full validation error context",
         extra={
             "path": str(request.url.path),
             "method": request.method,
