@@ -193,17 +193,24 @@ components:
     ObjectCreate:
       type: object
       required: [body]
+      description: |
+        Request body for creating an object. 
+        IMPORTANT: Only include the 'body' field - do not include gpt_id, collection_name, or any path parameters.
+        The gpt_id and collection_name are provided in the URL path, not in the request body.
+      additionalProperties: false
       properties:
         body:
           type: object
-          description: Object JSON data - all your actual data goes inside this body field
+          description: |
+            Object JSON data - all your actual data goes inside this body field.
+            Do not include gpt_id or collection_name here - they are path parameters.
           additionalProperties: true
       example:
         body:
-          title: "My First Note"
-          content: "This is the content of my note"
-          tags: ["personal", "ideas"]
-          priority: "medium"
+          date: "2025-09-03"
+          entry: "Today was a wonderful day! I spent time working on projects and felt very productive."
+          mood: "happy"
+          tags: ["personal", "daily", "productivity"]
     
     ObjectUpdate:
       type: object
@@ -863,9 +870,12 @@ paths:
       description: |
         Create a new object in a collection with JSON Schema validation.
         
-        IMPORTANT: Wrap your data in a 'body' field. Do not send fields directly.
-        Example: {"body": {"title": "My Entry", "content": "..."}}
+        IMPORTANT: 
+        - Wrap your data in a 'body' field. Do not send fields directly.
+        - Do NOT include gpt_id or collection_name in the request body - they are provided in the URL path.
+        - Only send: {"body": {"your": "data", "goes": "here"}}
         
+        The gpt_id and collection_name are automatically extracted from the URL path parameters.
         Schema validation applied if defined.
       operationId: createObject
       x-openai-isConsequential: false
@@ -902,11 +912,10 @@ paths:
                 description: Example for diary GPT - note the body wrapper is required
                 value:
                   body:
-                    title: "My Diary Entry"
-                    content: "Today was a wonderful day..."
                     date: "2025-09-03"
+                    entry: "Today was a wonderful day! I spent time working on projects and felt very productive."
                     mood: "happy"
-                    tags: ["personal", "daily"]
+                    tags: ["personal", "daily", "productivity"]
               note:
                 summary: Note object  
                 description: Example note - all data must be inside the body field

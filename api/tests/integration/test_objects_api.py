@@ -142,6 +142,72 @@ class TestObjectsAPIIntegration:
             assert data["body"]["title"] == "Test Entry"
             assert data["body"]["content"] == "Test content"
     
+    def test_create_object_rejects_extra_path_parameters_in_body(self, client, auth_headers):
+        """Test that API rejects requests with gpt_id and collection_name in body.
+        
+        This test validates the fix for the issue where GPT Actions was incorrectly 
+        including path parameters (gpt_id, collection_name) in the request body,
+        causing 422 UnrecognizedKwargsError.
+        """
+        # Test the problematic case where GPT Actions includes path params in body
+        response = client.post(
+            "/gpts/gpt-4-test/collections/notes/objects",
+            headers=auth_headers,
+            json={
+                "gpt_id": "diary-gpt",  # This should NOT be here
+                "collection_name": "diary_entries",  # This should NOT be here  
+                "body": {
+                    "date": "2025-09-03",
+                    "entry": "Test diary entry",
+                    "mood": "happy",
+                    "tags": ["test"]
+                }
+            }
+        )
+        
+        # Should return 422 validation error due to extra fields
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.headers["content-type"] == "application/problem+json"
+        
+        error_data = response.json()
+        # Should mention forbidden or unexpected fields
+        detail = error_data.get("detail", "").lower()
+        assert any(word in detail for word in ["extra", "forbidden", "additional", "unexpected", "not permitted"])
+        
+        # Test the correct format works (no extra fields in body)
+        with patch('api.src.routes.objects.create_object') as mock_create:
+            mock_create.return_value = Object(
+                id=uuid4(),
+                gpt_id="gpt-4-test", 
+                collection="notes",
+                body={
+                    "date": "2025-09-03",
+                    "entry": "Test diary entry", 
+                    "mood": "happy",
+                    "tags": ["test"]
+                },
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc)
+            )
+            
+            response = client.post(
+                "/gpts/gpt-4-test/collections/notes/objects",
+                headers=auth_headers,
+                json={
+                    "body": {
+                        "date": "2025-09-03",
+                        "entry": "Test diary entry",
+                        "mood": "happy", 
+                        "tags": ["test"]
+                    }
+                }
+            )
+            
+            assert response.status_code == status.HTTP_201_CREATED
+            data = response.json()
+            assert data["body"]["entry"] == "Test diary entry"
+            assert data["body"]["mood"] == "happy"
+    
     def test_create_object_validation_error(self, client, auth_headers):
         """Test object creation with schema validation error."""
         from api.src.errors.problem_details import BadRequestError
