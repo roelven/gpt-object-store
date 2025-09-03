@@ -99,9 +99,13 @@ def create_app() -> FastAPI:
             lifespan=lifespan
         )
         
-        # Override the openapi method to return our custom spec
+        # Override the openapi method to return our custom spec with dynamic server URL
         def get_custom_openapi():
-            return custom_openapi
+            spec = custom_openapi.copy()
+            # Update server URL with the actual API_URL from settings
+            if 'servers' in spec and spec['servers']:
+                spec['servers'][0]['url'] = f"{settings.api_url}/v1"
+            return spec
         
         app.openapi = get_custom_openapi
     else:
