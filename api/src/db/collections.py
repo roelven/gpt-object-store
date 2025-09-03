@@ -1,5 +1,6 @@
 """Database operations for collections."""
 
+import json
 import logging
 from typing import Optional, List, Dict, Any
 from uuid import UUID
@@ -52,17 +53,27 @@ async def create_collection(
                 RETURNING id, gpt_id, name, schema, created_at
             """
             
+            # Convert schema dict to JSON string for JSONB parameter
+            schema_json = None
+            if collection_data.json_schema:
+                schema_json = json.dumps(collection_data.json_schema)
+            
             row = await conn.fetchrow(
                 query,
                 gpt_id,
                 collection_data.name,
-                collection_data.json_schema
+                schema_json
             )
             
             if not row:
                 raise InternalServerError("Failed to create collection")
             
-            collection_row = CollectionRow.model_validate(dict(row))
+            # Convert row to dict and handle JSONB schema parsing
+            row_dict = dict(row)
+            if row_dict.get('schema') and isinstance(row_dict['schema'], str):
+                row_dict['schema'] = json.loads(row_dict['schema'])
+            
+            collection_row = CollectionRow.model_validate(row_dict)
             logger.info(f"Created/updated collection {collection_row.id} for GPT {gpt_id}")
             
             return collection_row.to_collection()
@@ -110,7 +121,12 @@ async def get_collection(
             if not row:
                 raise NotFoundError(f"Collection '{collection_name}' not found for GPT '{gpt_id}'")
             
-            collection_row = CollectionRow.model_validate(dict(row))
+            # Convert row to dict and handle JSONB schema parsing
+            row_dict = dict(row)
+            if row_dict.get('schema') and isinstance(row_dict['schema'], str):
+                row_dict['schema'] = json.loads(row_dict['schema'])
+            
+            collection_row = CollectionRow.model_validate(row_dict)
             logger.debug(f"Retrieved collection {collection_row.id} for GPT {gpt_id}")
             
             return collection_row.to_collection()
@@ -185,6 +201,9 @@ async def list_collections(
             # Convert to Collection models
             collections = []
             for item in page_items:
+                # Handle JSONB schema parsing
+                if item.get('schema') and isinstance(item['schema'], str):
+                    item['schema'] = json.loads(item['schema'])
                 collection_row = CollectionRow.model_validate(item)
                 collections.append(collection_row.to_collection())
             
@@ -232,17 +251,27 @@ async def update_collection(
                 RETURNING id, gpt_id, name, schema, created_at
             """
             
+            # Convert schema dict to JSON string for JSONB parameter
+            schema_json = None
+            if update_data.json_schema:
+                schema_json = json.dumps(update_data.json_schema)
+            
             row = await conn.fetchrow(
                 query,
                 gpt_id,
                 collection_name,
-                update_data.json_schema
+                schema_json
             )
             
             if not row:
                 raise NotFoundError(f"Collection '{collection_name}' not found for GPT '{gpt_id}'")
             
-            collection_row = CollectionRow.model_validate(dict(row))
+            # Convert row to dict and handle JSONB schema parsing
+            row_dict = dict(row)
+            if row_dict.get('schema') and isinstance(row_dict['schema'], str):
+                row_dict['schema'] = json.loads(row_dict['schema'])
+            
+            collection_row = CollectionRow.model_validate(row_dict)
             logger.info(f"Updated collection {collection_row.id} for GPT {gpt_id}")
             
             return collection_row.to_collection()

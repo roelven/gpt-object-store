@@ -19,31 +19,33 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             logger.info(f"POST request to: {request.url.path}")
             logger.info(f"Headers: {dict(request.headers)}")
             
-            # Read and log request body
+            # Read and log request body - but properly preserve it for FastAPI
             try:
-                body = await request.body()
-                if body:
+                # Get the body from the request
+                body_bytes = await request.body()
+                if body_bytes:
                     try:
                         # Try to parse as JSON for better formatting
-                        body_json = json.loads(body.decode('utf-8'))
+                        body_json = json.loads(body_bytes.decode('utf-8'))
                         logger.info(f"Request body (JSON): {body_json}")
                     except (json.JSONDecodeError, UnicodeDecodeError):
                         # If not JSON, log as raw string
-                        logger.info(f"Request body (raw): {body.decode('utf-8', errors='ignore')}")
+                        logger.info(f"Request body (raw): {body_bytes.decode('utf-8', errors='ignore')}")
                 else:
                     logger.info("Request body: (empty)")
-                    
-                # We need to recreate the request with the body since we consumed it
-                from starlette.requests import Request as StarletteRequest
-                from starlette.datastructures import Headers
                 
-                # Create a new request with the body preserved
+                # Properly recreate the request with the preserved body
+                # We need to replace the body stream in the ASGI scope
+                async def receive():
+                    return {"type": "http.request", "body": body_bytes, "more_body": False}
+                
+                # Update the scope with the new receive callable
                 scope = request.scope.copy()
-                scope["body"] = body
+                scope["receive"] = receive
                 
-                # Create new request object
-                new_request = StarletteRequest(scope)
-                new_request._body = body
+                # Create new request with proper body preservation
+                from starlette.requests import Request as StarletteRequest
+                new_request = StarletteRequest(scope, receive)
                 
                 response = await call_next(new_request)
                 

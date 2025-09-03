@@ -121,7 +121,8 @@ def create_app() -> FastAPI:
         )
     
     # Add request logging middleware for debugging (first, so it captures everything)
-    app.add_middleware(RequestLoggingMiddleware)
+    # TODO: Temporarily disabled due to body parsing interference
+    # app.add_middleware(RequestLoggingMiddleware)
     
     # Add rate limiting middleware (before CORS to limit all requests)
     # Use same skip paths as auth middleware

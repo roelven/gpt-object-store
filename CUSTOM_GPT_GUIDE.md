@@ -77,7 +77,7 @@ curl -X POST https://api.yourdomain.com/v1/gpts/diary-gpt/collections \
   -H "Content-Type: application/json" \
   -d '{
     "name": "diary_entries",
-    "collection_schema": {
+    "schema": {
       "type": "object",
       "properties": {
         "date": {"type": "string", "format": "date"},

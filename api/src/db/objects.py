@@ -113,7 +113,12 @@ async def create_object(
             if not row:
                 raise InternalServerError("Failed to create object")
             
-            object_row = ObjectRow.model_validate(dict(row))
+            # Convert row to dict and handle JSONB body parsing
+            row_dict = dict(row)
+            if row_dict.get('body') and isinstance(row_dict['body'], str):
+                row_dict['body'] = json.loads(row_dict['body'])
+            
+            object_row = ObjectRow.model_validate(row_dict)
             logger.info(f"Created object {object_row.id} in collection {collection_name} for GPT {gpt_id}")
             
             return object_row.to_object()
@@ -162,7 +167,12 @@ async def get_object(object_id: UUID, gpt_id: str) -> Object:
             if not row:
                 raise NotFoundError(f"Object '{object_id}' not found for GPT '{gpt_id}'")
             
-            object_row = ObjectRow.model_validate(dict(row))
+            # Convert row to dict and handle JSONB body parsing
+            row_dict = dict(row)
+            if row_dict.get('body') and isinstance(row_dict['body'], str):
+                row_dict['body'] = json.loads(row_dict['body'])
+            
+            object_row = ObjectRow.model_validate(row_dict)
             logger.debug(f"Retrieved object {object_row.id} for GPT {gpt_id}")
             
             return object_row.to_object()
@@ -253,6 +263,9 @@ async def list_objects(
             # Convert to Object models
             objects = []
             for item in page_items:
+                # Handle JSONB body parsing
+                if item.get('body') and isinstance(item['body'], str):
+                    item['body'] = json.loads(item['body'])
                 object_row = ObjectRow.model_validate(item)
                 objects.append(object_row.to_object())
             
@@ -326,7 +339,12 @@ async def update_object(
             if not row:
                 raise NotFoundError(f"Object '{object_id}' not found for GPT '{gpt_id}'")
             
-            object_row = ObjectRow.model_validate(dict(row))
+            # Convert row to dict and handle JSONB body parsing
+            row_dict = dict(row)
+            if row_dict.get('body') and isinstance(row_dict['body'], str):
+                row_dict['body'] = json.loads(row_dict['body'])
+            
+            object_row = ObjectRow.model_validate(row_dict)
             logger.info(f"Updated object {object_row.id} for GPT {gpt_id}")
             
             return object_row.to_object()
