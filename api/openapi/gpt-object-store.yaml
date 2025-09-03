@@ -196,12 +196,19 @@ components:
       properties:
         body:
           type: object
-          description: Object JSON data
+          description: Object JSON data - all your actual data goes inside this body field
+          additionalProperties: true
           example:
             title: "My First Note"
             content: "This is the content of my note"
             tags: ["personal", "ideas"]
             priority: "medium"
+      example:
+        body:
+          title: "My First Note"
+          content: "This is the content of my note"
+          tags: ["personal", "ideas"]
+          priority: "medium"
     
     ObjectUpdate:
       type: object
@@ -856,6 +863,18 @@ paths:
       summary: Create an object
       description: |
         Create a new object in a collection with optional JSON Schema validation.
+        
+        IMPORTANT: The request body must contain a 'body' field with your actual object data.
+        Do not send your data fields directly - wrap them in a 'body' object.
+        
+        Example request format:
+        {
+          "body": {
+            "your_field": "your_value",
+            "another_field": "another_value"
+          }
+        }
+        
         The object will be validated against the collection's JSON Schema if one is defined.
       operationId: createObject
       tags: [Objects]
@@ -886,8 +905,19 @@ paths:
             schema:
               $ref: '#/components/schemas/ObjectCreate'
             examples:
+              diary_entry:
+                summary: Diary entry object
+                description: Example for diary GPT - note the body wrapper is required
+                value:
+                  body:
+                    title: "My Diary Entry"
+                    content: "Today was a wonderful day..."
+                    date: "2025-09-03"
+                    mood: "happy"
+                    tags: ["personal", "daily"]
               note:
-                summary: Note object
+                summary: Note object  
+                description: Example note - all data must be inside the body field
                 value:
                   body:
                     title: "My First Note"
@@ -896,11 +926,13 @@ paths:
                     priority: "medium"
               task:
                 summary: Task object
+                description: Example task - wrap your data in the body field
                 value:
                   body:
                     name: "Complete project"
                     completed: false
                     due_date: "2024-01-15"
+                    priority: "high"
                     assignee: "Alice"
       responses:
         '201':
