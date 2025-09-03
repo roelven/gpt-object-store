@@ -34,33 +34,38 @@ git clone https://github.com/yourusername/gpt-object-store.git
 cd gpt-object-store
 
 # Configure your environment
-export DATABASE_URL="postgresql://user:pass@host:5432/gptstore"
-export API_URL="https://api.yourdomain.com"
+cd ops
+cp .env.sample .env
+# Edit .env with your configuration
+vim .env  # Set API_URL, database credentials, etc.
 
 # Start services
-cd ops
 docker compose up -d
 ```
 
 ### 2. Create a GPT and API Key
 
-Create a GPT identity and generate an API key:
+Create a GPT identity and generate an API key using the provided Makefile commands:
 
 ```bash
-# Connect to your database
-psql $DATABASE_URL
+cd ops
 
--- Create a GPT for the diary
-INSERT INTO gpts (id, name) VALUES ('diary-gpt', 'Daily Diary Assistant');
+# Create a GPT for the diary
+make create-gpt ID=diary-gpt NAME="Daily Diary Assistant"
 
--- Generate an API key (save this - you'll need it later)
--- In production, use the API to generate keys
-INSERT INTO api_keys (token_hash, gpt_id) 
-VALUES (
-  crypt('your-secret-api-key-here', gen_salt('bf')),
-  'diary-gpt'
-);
+# Generate an API key (save this - you'll need it later)
+make create-key GPT_ID=diary-gpt
+# Output: API Key: <your-generated-key>
+# ⚠️ Save this key securely - it cannot be retrieved again!
+
+# Verify the GPT was created
+make list-gpts
+
+# Check API keys for your GPT
+make list-keys GPT_ID=diary-gpt
 ```
+
+**Note**: The API key will only be shown once when created. Store it securely as it cannot be retrieved later.
 
 ### 3. Create a Collection
 

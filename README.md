@@ -79,9 +79,10 @@ pip install -r requirements-dev.txt
 
 3. **Configure environment variables**
 ```bash
-export DATABASE_URL="postgresql://gptstore:change-me@localhost:5432/gptstore"
-export RATE_LIMITS="key:60/m,write:10/m,ip:600/5m"
-export LOG_LEVEL="INFO"
+cd ops
+cp .env.sample .env
+# Edit .env with your settings, especially API_URL
+vim .env  # or use your preferred editor
 ```
 
 4. **Run database migrations**
@@ -110,6 +111,46 @@ make status
 3. **View logs**
 ```bash
 make logs
+```
+
+## 🔑 API Key Management
+
+The GPT Object Store uses API keys for authentication. Use the Makefile commands to manage GPTs and API keys:
+
+### Create a GPT and API Key
+
+```bash
+cd ops
+
+# First, create a GPT identity
+make create-gpt ID=diary-gpt NAME="Daily Diary Assistant"
+
+# Then generate an API key for it
+make create-key GPT_ID=diary-gpt
+# Output: API Key: abc123... (save this securely - it cannot be retrieved again!)
+```
+
+### List and Manage
+
+```bash
+# List all GPTs
+make list-gpts
+
+# List API keys for a specific GPT (shows metadata only)
+make list-keys GPT_ID=diary-gpt
+
+# Revoke an API key
+make revoke-key KEY=abc123...
+```
+
+### Database Access
+
+```bash
+# Direct PostgreSQL access when needed
+make db-shell
+
+# Manual backup
+make db-backup
 ```
 
 ## 🧪 Testing
@@ -319,6 +360,29 @@ docker compose -f ops/compose.yml exec db pg_restore \
 ```
 
 ## 🚦 Monitoring
+
+### Troubleshooting
+
+#### Missing API_URL Error
+
+**Problem**: "API_URL environment variable is required"
+
+**Solution**: 
+- Copy `.env.sample` to `.env` in the ops directory
+- Set `API_URL` to your public API endpoint
+- This is required for OpenAPI spec generation and GPT Actions
+
+#### Database Connection Issues
+
+**Problem**: Cannot connect to database externally
+
+**Solution**:
+The database is now internal to Docker and not exposed on port 5432. Access it via:
+```bash
+make db-shell
+# or
+docker compose exec db psql -U gptstore -d gptstore
+```
 
 ### Health Checks
 
