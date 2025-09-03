@@ -90,6 +90,26 @@ curl -X POST https://api.yourdomain.com/v1/gpts/diary-gpt/collections \
   }'
 ```
 
+**Expected Response:**
+```json
+{
+  "name": "diary_entries",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "date": {"type": "string", "format": "date"},
+      "entry": {"type": "string"},
+      "mood": {"type": "string", "enum": ["happy", "sad", "neutral", "excited", "anxious"]},
+      "tags": {"type": "array", "items": {"type": "string"}}
+    },
+    "required": ["date", "entry"]
+  },
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "gpt_id": "diary-gpt",
+  "created_at": "2024-01-01T12:00:00Z"
+}
+```
+
 ## Creating Your Custom GPT
 
 ### 1. Navigate to GPT Builder
@@ -121,193 +141,9 @@ In the GPT Builder, go to the **Configure** tab and scroll to **Actions**:
 1. Click "Create new action"
 2. Click "Import from URL" 
 3. Enter: `https://api.yourdomain.com/openapi.json`
+4. Click "Import" to load the schema
 
-Or manually paste this schema:
-
-```yaml
-openapi: 3.1.0
-info:
-  title: Diary GPT Backend
-  version: 1.0.0
-servers:
-  - url: https://api.yourdomain.com/v1
-    description: Production API
-
-components:
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      
-  schemas:
-    DiaryEntry:
-      type: object
-      properties:
-        date:
-          type: string
-          format: date
-        entry:
-          type: string
-        mood:
-          type: string
-          enum: [happy, sad, neutral, excited, anxious]
-        tags:
-          type: array
-          items:
-            type: string
-            
-    Error:
-      type: object
-      properties:
-        type:
-          type: string
-        title:
-          type: string
-        status:
-          type: integer
-        detail:
-          type: string
-
-paths:
-  /gpts/diary-gpt/collections/diary_entries/objects:
-    post:
-      operationId: saveDiaryEntry
-      summary: Save a new diary entry
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                body:
-                  $ref: '#/components/schemas/DiaryEntry'
-      responses:
-        '201':
-          description: Entry saved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  id:
-                    type: string
-                  body:
-                    $ref: '#/components/schemas/DiaryEntry'
-                  created_at:
-                    type: string
-        '400':
-          description: Invalid request
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Error'
-                
-    get:
-      operationId: getDiaryEntries
-      summary: Retrieve diary entries
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 50
-            maximum: 200
-        - name: cursor
-          in: query
-          schema:
-            type: string
-        - name: order
-          in: query
-          schema:
-            type: string
-            enum: [asc, desc]
-            default: desc
-      responses:
-        '200':
-          description: List of diary entries
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  items:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        id:
-                          type: string
-                        body:
-                          $ref: '#/components/schemas/DiaryEntry'
-                        created_at:
-                          type: string
-                        updated_at:
-                          type: string
-                  has_more:
-                    type: boolean
-                  next_cursor:
-                    type: string
-
-  /objects/{id}:
-    get:
-      operationId: getDiaryEntry
-      summary: Get a specific diary entry
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Diary entry details
-          
-    patch:
-      operationId: updateDiaryEntry
-      summary: Update a diary entry
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                body:
-                  $ref: '#/components/schemas/DiaryEntry'
-      responses:
-        '200':
-          description: Entry updated successfully
-          
-    delete:
-      operationId: deleteDiaryEntry
-      summary: Delete a diary entry
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '204':
-          description: Entry deleted successfully
-```
+**Note**: The OpenAPI schema is automatically maintained and always reflects the current API capabilities. This method ensures you always have the most up-to-date schema with all available operations and the latest features.
 
 ### 2. Configure Authentication
 
