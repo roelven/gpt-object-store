@@ -597,6 +597,7 @@ paths:
         This endpoint supports upsert behavior - if a collection with the same name already exists,
         it will be updated with the new schema.
       operationId: createOrUpdateCollection
+      x-openai-isConsequential: true
       tags: [Collections]
       parameters:
         - name: gpt_id
@@ -759,6 +760,7 @@ paths:
       summary: Update a collection
       description: Update a collection's JSON Schema
       operationId: updateCollection
+      x-openai-isConsequential: false
       tags: [Collections]
       parameters:
         - name: gpt_id
@@ -822,6 +824,7 @@ paths:
       summary: Delete a collection
       description: Delete a collection and all its objects
       operationId: deleteCollection
+      x-openai-isConsequential: true
       tags: [Collections]
       parameters:
         - name: gpt_id
@@ -869,6 +872,7 @@ paths:
         
         Schema validation applied if defined.
       operationId: createObject
+      x-openai-isConsequential: false
       tags: [Objects]
       parameters:
         - name: gpt_id
@@ -1057,6 +1061,7 @@ paths:
         Partially update an object with JSON Schema validation and automatic updated_at timestamp.
         Supports partial updates while preserving other fields.
       operationId: updateObject
+      x-openai-isConsequential: false
       tags: [Objects]
       parameters:
         - name: object_id
@@ -1101,6 +1106,7 @@ paths:
         Delete an object with GPT ownership validation.
         The object must belong to the authenticated GPT. Once deleted, the object cannot be recovered.
       operationId: deleteObject
+      x-openai-isConsequential: false
       tags: [Objects]
       parameters:
         - name: object_id
