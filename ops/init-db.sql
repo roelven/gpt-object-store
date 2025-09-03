@@ -12,8 +12,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 SET timezone = 'UTC';
 
 -- Configure some basic PostgreSQL settings for better JSONB performance
--- These settings help with JSONB operations and GIN indexes
-ALTER DATABASE gptstore SET shared_preload_libraries = 'pg_stat_statements';
+-- Note: shared_preload_libraries must be set at server level, not database level
 ALTER DATABASE gptstore SET log_statement = 'mod';
 ALTER DATABASE gptstore SET log_min_duration_statement = 1000;
 
