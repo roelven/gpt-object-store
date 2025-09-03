@@ -33,8 +33,6 @@ info:
 servers:
   - url: https://api.yourdomain.com/v1
     description: Production server
-  - url: http://localhost:8000/v1
-    description: Development server
 
 components:
   securitySchemes:
@@ -43,16 +41,6 @@ components:
       scheme: bearer
       bearerFormat: APIKey
       description: API key authentication using Bearer token
-    oauth2:
-      type: oauth2
-      flows:
-        authorizationCode:
-          authorizationUrl: https://auth.yourdomain.com/oauth/authorize
-          tokenUrl: https://auth.yourdomain.com/oauth/token
-          scopes:
-            objects:read: Read objects and collections
-            objects:write: Create, update, and delete objects and collections
-      description: OAuth 2.0 authentication (future implementation)
 
   schemas:
     # Core data models
@@ -351,72 +339,6 @@ components:
           description: Health check URL path
           example: "/health"
 
-  parameters:
-    GptId:
-      name: gpt_id
-      in: path
-      required: true
-      schema:
-        type: string
-        pattern: '^[a-zA-Z0-9-_.]+$'
-        minLength: 1
-        maxLength: 100
-      description: GPT identifier
-      example: "gpt-4-custom"
-    
-    CollectionName:
-      name: collection_name
-      in: path
-      required: true
-      schema:
-        type: string
-        minLength: 1
-        maxLength: 100
-      description: Collection name
-      example: "notes"
-    
-    ObjectId:
-      name: object_id
-      in: path
-      required: true
-      schema:
-        type: string
-        format: uuid
-      description: Object UUID
-      example: "550e8400-e29b-41d4-a716-446655440000"
-    
-    Limit:
-      name: limit
-      in: query
-      required: false
-      schema:
-        type: integer
-        minimum: 1
-        maximum: 200
-        default: 50
-      description: Number of items per page
-      example: 50
-    
-    Cursor:
-      name: cursor
-      in: query
-      required: false
-      schema:
-        type: string
-        nullable: true
-      description: Cursor for pagination
-      example: "eyJjcmVhdGVkX2F0IjoiMjAyNC0wMS0wMVQxMjowMDowMFoiLCJpZCI6IjU1MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMCJ9"
-    
-    Order:
-      name: order
-      in: query
-      required: false
-      schema:
-        type: string
-        enum: [asc, desc]
-        default: desc
-      description: Sort order
-      example: "desc"
 
   responses:
     # Success responses
@@ -661,9 +583,6 @@ paths:
 
   # Collections endpoints
   /gpts/{gpt_id}/collections:
-    parameters:
-      - $ref: '#/components/parameters/GptId'
-    
     post:
       summary: Create or update a collection
       description: |
@@ -672,6 +591,17 @@ paths:
         it will be updated with the new schema.
       operationId: createOrUpdateCollection
       tags: [Collections]
+      parameters:
+        - name: gpt_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9-_.]+$'
+            minLength: 1
+            maxLength: 100
+          description: GPT identifier
+          example: "gpt-4-custom"
       requestBody:
         required: true
         content:
@@ -727,9 +657,43 @@ paths:
       operationId: listCollections
       tags: [Collections]
       parameters:
-        - $ref: '#/components/parameters/Limit'
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Order'
+        - name: gpt_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9-_.]+$'
+            minLength: 1
+            maxLength: 100
+          description: GPT identifier
+          example: "gpt-4-custom"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+          description: Number of items per page
+          example: 50
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            nullable: true
+          description: Cursor for pagination
+          example: "eyJjcmVhdGVkX2F0IjoiMjAyNC0wMS0wMVQxMjowMDowMFoiLCJpZCI6IjU1MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMCJ9"
+        - name: order
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+          description: Sort order
+          example: "desc"
       responses:
         '200':
           $ref: '#/components/responses/CollectionList'
@@ -745,15 +709,31 @@ paths:
           $ref: '#/components/responses/InternalServerError'
 
   /gpts/{gpt_id}/collections/{collection_name}:
-    parameters:
-      - $ref: '#/components/parameters/GptId'
-      - $ref: '#/components/parameters/CollectionName'
-    
     get:
       summary: Get a collection
       description: Retrieve a specific collection by name
       operationId: getCollection
       tags: [Collections]
+      parameters:
+        - name: gpt_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9-_.]+$'
+            minLength: 1
+            maxLength: 100
+          description: GPT identifier
+          example: "gpt-4-custom"
+        - name: collection_name
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+          description: Collection name
+          example: "notes"
       responses:
         '200':
           $ref: '#/components/responses/Collection'
@@ -773,6 +753,26 @@ paths:
       description: Update a collection's JSON Schema
       operationId: updateCollection
       tags: [Collections]
+      parameters:
+        - name: gpt_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9-_.]+$'
+            minLength: 1
+            maxLength: 100
+          description: GPT identifier
+          example: "gpt-4-custom"
+        - name: collection_name
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+          description: Collection name
+          example: "notes"
       requestBody:
         required: true
         content:
@@ -816,6 +816,26 @@ paths:
       description: Delete a collection and all its objects
       operationId: deleteCollection
       tags: [Collections]
+      parameters:
+        - name: gpt_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9-_.]+$'
+            minLength: 1
+            maxLength: 100
+          description: GPT identifier
+          example: "gpt-4-custom"
+        - name: collection_name
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+          description: Collection name
+          example: "notes"
       responses:
         '204':
           $ref: '#/components/responses/NoContent'
@@ -832,10 +852,6 @@ paths:
 
   # Collection objects endpoints
   /gpts/{gpt_id}/collections/{collection_name}/objects:
-    parameters:
-      - $ref: '#/components/parameters/GptId'
-      - $ref: '#/components/parameters/CollectionName'
-    
     post:
       summary: Create an object
       description: |
@@ -843,6 +859,26 @@ paths:
         The object will be validated against the collection's JSON Schema if one is defined.
       operationId: createObject
       tags: [Objects]
+      parameters:
+        - name: gpt_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9-_.]+$'
+            minLength: 1
+            maxLength: 100
+          description: GPT identifier
+          example: "gpt-4-custom"
+        - name: collection_name
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+          description: Collection name
+          example: "notes"
       requestBody:
         required: true
         content:
@@ -897,9 +933,52 @@ paths:
       operationId: listObjects
       tags: [Objects]
       parameters:
-        - $ref: '#/components/parameters/Limit'
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Order'
+        - name: gpt_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9-_.]+$'
+            minLength: 1
+            maxLength: 100
+          description: GPT identifier
+          example: "gpt-4-custom"
+        - name: collection_name
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+          description: Collection name
+          example: "notes"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+          description: Number of items per page
+          example: 50
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            nullable: true
+          description: Cursor for pagination
+          example: "eyJjcmVhdGVkX2F0IjoiMjAyNC0wMS0wMVQxMTozMDowMFoiLCJpZCI6IjY2MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMSJ9"
+        - name: order
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+          description: Sort order
+          example: "desc"
       responses:
         '200':
           $ref: '#/components/responses/ObjectList'
@@ -918,9 +997,6 @@ paths:
 
   # Direct object endpoints
   /objects/{object_id}:
-    parameters:
-      - $ref: '#/components/parameters/ObjectId'
-    
     get:
       summary: Get an object
       description: |
@@ -928,6 +1004,15 @@ paths:
         The object must belong to the authenticated GPT.
       operationId: getObject
       tags: [Objects]
+      parameters:
+        - name: object_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Object UUID
+          example: "550e8400-e29b-41d4-a716-446655440000"
       responses:
         '200':
           $ref: '#/components/responses/Object'
@@ -946,11 +1031,18 @@ paths:
       summary: Update an object
       description: |
         Partially update an object with JSON Schema validation and automatic updated_at timestamp.
-        This endpoint supports partial updates - you can update just specific fields in the object's
-        body while preserving other fields. The updated object will be validated against the
-        collection's JSON Schema if one is defined.
+        Supports partial updates while preserving other fields.
       operationId: updateObject
       tags: [Objects]
+      parameters:
+        - name: object_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Object UUID
+          example: "550e8400-e29b-41d4-a716-446655440000"
       requestBody:
         required: true
         content:
@@ -986,6 +1078,15 @@ paths:
         The object must belong to the authenticated GPT. Once deleted, the object cannot be recovered.
       operationId: deleteObject
       tags: [Objects]
+      parameters:
+        - name: object_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Object UUID
+          example: "550e8400-e29b-41d4-a716-446655440000"
       responses:
         '204':
           $ref: '#/components/responses/NoContent'
