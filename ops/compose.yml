@@ -42,7 +42,8 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "8000:8000"
+      # External port (configurable) : Internal port (always 8000)
+      - "${EXTERNAL_API_PORT:-8000}:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health', timeout=5)"]
       interval: 10s

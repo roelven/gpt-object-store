@@ -862,20 +862,12 @@ paths:
     post:
       summary: Create an object
       description: |
-        Create a new object in a collection with optional JSON Schema validation.
+        Create a new object in a collection with JSON Schema validation.
         
-        IMPORTANT: The request body must contain a 'body' field with your actual object data.
-        Do not send your data fields directly - wrap them in a 'body' object.
+        IMPORTANT: Wrap your data in a 'body' field. Do not send fields directly.
+        Example: {"body": {"title": "My Entry", "content": "..."}}
         
-        Example request format:
-        {
-          "body": {
-            "your_field": "your_value",
-            "another_field": "another_value"
-          }
-        }
-        
-        The object will be validated against the collection's JSON Schema if one is defined.
+        Schema validation applied if defined.
       operationId: createObject
       tags: [Objects]
       parameters:
