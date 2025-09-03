@@ -186,5 +186,39 @@ def create_gpt_path_validator():
     return validate_gpt_path
 
 
-# Create the path validator dependency
+# Create the path validator dependency (middleware-based)
 ValidatedGPTId = Annotated[str, Depends(create_gpt_path_validator())]
+
+def create_direct_gpt_path_validator():
+    """Create a dependency that validates gpt_id in path with direct auth.
+    
+    Returns:
+        A dependency function that validates path gpt_id against directly authenticated gpt_id
+    """
+    async def validate_gpt_path_direct(
+        gpt_id: str,  # This comes from the path parameter
+        current_gpt_id: AuthenticatedGPTId
+    ) -> str:
+        """Validate that path gpt_id matches directly authenticated gpt_id.
+        
+        Args:
+            gpt_id: The gpt_id from the URL path
+            current_gpt_id: The authenticated gpt_id from direct validation
+            
+        Returns:
+            The validated gpt_id
+            
+        Raises:
+            ForbiddenError: If path gpt_id doesn't match authenticated gpt_id
+        """
+        if gpt_id != current_gpt_id:
+            raise ForbiddenError(
+                f"Path GPT ID '{gpt_id}' does not match authenticated GPT ID '{current_gpt_id}'"
+            )
+        
+        return gpt_id
+    
+    return validate_gpt_path_direct
+
+# Create the direct path validator dependency
+DirectValidatedGPTId = Annotated[str, Depends(create_direct_gpt_path_validator())]

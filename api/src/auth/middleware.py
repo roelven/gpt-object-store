@@ -38,9 +38,16 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
     
     async def dispatch(self, request: Request, call_next):
         """Process the request through authentication middleware."""
+        print(f"DEBUG: AuthMiddleware called for {request.url.path}")  # Force output
+        logger.info(f"AuthMiddleware: Processing request for {request.url.path}")
+        
         # Skip authentication for certain paths
         if request.url.path in self.skip_paths:
+            print(f"DEBUG: Skipping auth for {request.url.path}")  # Force output  
+            logger.debug(f"AuthMiddleware: Skipping authentication for {request.url.path}")
             return await call_next(request)
+        
+        logger.info(f"AuthMiddleware: Authenticating request for {request.url.path}")
         
         try:
             # Extract and validate Bearer token
@@ -50,13 +57,13 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             request.state.gpt_id = gpt_id
             request.state.authenticated = True
             
-            logger.debug(f"Authenticated request for gpt_id: {gpt_id}")
+            logger.info(f"AuthMiddleware: Successfully authenticated request for gpt_id: {gpt_id}")
             
         except UnauthorizedError as e:
-            logger.warning(f"Authentication failed for {request.url.path}: {e.detail}")
+            logger.warning(f"AuthMiddleware: Authentication failed for {request.url.path}: {e.detail}")
             return e.to_response(request)
         except Exception as e:
-            logger.error(f"Unexpected error in authentication middleware: {e}")
+            logger.error(f"AuthMiddleware: Unexpected error in authentication middleware: {e}")
             error = UnauthorizedError("Authentication failed due to internal error")
             return error.to_response(request)
         
@@ -76,16 +83,21 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         """
         # Extract Authorization header
         auth_header = request.headers.get("Authorization")
+        logger.info(f"AuthMiddleware: Authorization header present: {bool(auth_header)}")
+        
         if not auth_header:
             raise UnauthorizedError("Missing Authorization header")
         
         # Parse Bearer token
         if not auth_header.startswith("Bearer "):
+            logger.warning(f"AuthMiddleware: Invalid auth header format: {auth_header[:20]}...")
             raise UnauthorizedError("Invalid Authorization header format. Expected 'Bearer <token>'")
         
         token = auth_header[7:]  # Remove "Bearer " prefix
         if not token:
             raise UnauthorizedError("Empty bearer token")
+        
+        logger.info(f"AuthMiddleware: Extracted token: {token[:8]}...")
         
         # Determine token type and validate
         # For now, we assume all tokens are API keys
@@ -93,8 +105,10 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         gpt_id = await self._validate_api_key_token(token)
         
         if not gpt_id:
+            logger.warning(f"AuthMiddleware: Token validation failed for token: {token[:8]}...")
             raise UnauthorizedError("Invalid or expired bearer token")
         
+        logger.info(f"AuthMiddleware: Token validated successfully for gpt_id: {gpt_id}")
         return gpt_id
     
     async def _validate_api_key_token(self, token: str) -> Optional[str]:

@@ -17,6 +17,7 @@ from .db.connection import db_manager, get_db_pool
 from .errors import register_exception_handlers, create_problem_response
 from .errors.problem_details import ServiceUnavailableError
 from .rate_limit.middleware import RateLimitMiddleware
+from .auth.middleware import AuthenticationMiddleware
 from .routes import collections_router
 from .routes.objects import collection_objects_router, objects_router
 
@@ -116,6 +117,11 @@ def create_app() -> FastAPI:
     
     # Add rate limiting middleware (before CORS to limit all requests)
     app.add_middleware(RateLimitMiddleware)
+    
+    # Add authentication middleware (after rate limiting, before CORS)
+    # Skip paths for health checks and docs
+    auth_skip_paths = ["/health", "/ready", "/live", "/", "/docs", "/redoc", "/openapi.json"]
+    app.add_middleware(AuthenticationMiddleware, skip_paths=auth_skip_paths)
     
     # Configure CORS
     app.add_middleware(

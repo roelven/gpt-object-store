@@ -11,7 +11,7 @@ from ..models.collections import (
     CollectionResponse, CollectionListResponse
 )
 from ..pagination import PaginationParams, create_link_header
-from ..auth.dependencies import ValidatedGPTId, CurrentGPTId
+from ..auth.dependencies import ValidatedGPTId, CurrentGPTId, AuthenticatedGPTId, DirectValidatedGPTId
 from ..db.collections import (
     create_collection, get_collection, list_collections, 
     update_collection, delete_collection
@@ -34,6 +34,22 @@ router = APIRouter(
 )
 
 
+# Test endpoint for debugging authentication
+@router.get(
+    "/test-auth",
+    summary="Test authentication (debug only)",
+    description="Test endpoint to debug authentication",
+)
+async def test_auth(
+    authenticated_gpt_id: AuthenticatedGPTId
+) -> dict:
+    """Test endpoint to verify authentication is working."""
+    return {
+        "message": "Authentication successful",
+        "gpt_id": authenticated_gpt_id
+    }
+
+
 @router.post(
     "",
     response_model=CollectionResponse,
@@ -48,7 +64,7 @@ router = APIRouter(
 )
 async def create_or_update_collection(
     collection_data: CollectionCreate,
-    validated_gpt_id: ValidatedGPTId,
+    validated_gpt_id: DirectValidatedGPTId,
     request: Request
 ) -> CollectionResponse:
     """Create or update a collection for a GPT.

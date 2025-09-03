@@ -62,9 +62,17 @@ def verify_api_key(api_key: str, hashed: bytes) -> bool:
     Returns:
         True if the API key is valid, False otherwise
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
-        return pwd_context.verify(api_key, hashed.decode('utf-8'))
-    except Exception:
+        hash_str = hashed.decode('utf-8')
+        logger.debug(f"Verifying key {api_key[:8]}... against hash {hash_str[:20]}...")
+        result = pwd_context.verify(api_key, hash_str)
+        logger.debug(f"Verification result: {result}")
+        return result
+    except Exception as e:
+        logger.warning(f"Error verifying API key: {e}")
         return False
 
 
@@ -105,6 +113,11 @@ async def validate_api_key(api_key: str) -> Optional[str]:
     Returns:
         The GPT ID if the API key is valid, None otherwise
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"Validating API key: {api_key[:8]}...")
+    
     pool = await get_db_pool()
     async with pool.acquire() as conn:
         # Fetch all API key hashes to check against
@@ -113,14 +126,20 @@ async def validate_api_key(api_key: str) -> Optional[str]:
             "SELECT token_hash, gpt_id FROM api_keys"
         )
         
-        for row in rows:
+        logger.info(f"Found {len(rows)} stored API keys to check against")
+        
+        for i, row in enumerate(rows):
+            logger.debug(f"Checking against stored key {i+1}: {row['gpt_id']}")
             if verify_api_key(api_key, row['token_hash']):
+                logger.info(f"API key validated successfully for gpt_id: {row['gpt_id']}")
                 # Update last_used timestamp
                 await conn.execute(
                     "UPDATE api_keys SET last_used = $1 WHERE token_hash = $2",
                     datetime.utcnow(), row['token_hash']
                 )
                 return row['gpt_id']
+        
+        logger.warning(f"API key validation failed - no matching hash found")
     
     return None
 

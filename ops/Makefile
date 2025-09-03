@@ -104,22 +104,7 @@ list-gpts:
 # Revoke an API key
 revoke-key:
 	@test -n "$(KEY)" || (echo "Error: KEY is required. Usage: make revoke-key KEY=abc123..." && exit 1)
-	@docker compose exec api python -c " \
-import asyncio; \
-import sys; \
-sys.path.append('/app'); \
-from src.auth.api_key import revoke_api_key; \
-try: \
-    result = asyncio.run(revoke_api_key('$(KEY)')); \
-    if result: \
-        print('✓ API key revoked successfully'); \
-    else: \
-        print('✗ API key not found'); \
-        sys.exit(1); \
-except Exception as e: \
-    print(f'Error: {e}'); \
-    sys.exit(1); \
-"
+	@(printf 'import asyncio\nimport sys\nsys.path.append("/app")\nfrom src.auth.api_key import revoke_api_key\ntry:\n    result = asyncio.run(revoke_api_key("$(KEY)"))\n    if result:\n        print("✓ API key revoked successfully")\n    else:\n        print("✗ API key not found")\n        sys.exit(1)\nexcept Exception as e:\n    print(f"Error: {e}")\n    sys.exit(1)\n' | docker compose exec -T api python) 2>&1 | grep -vE "(trapped.*error reading bcrypt|AttributeError.*__about__|passlib/handlers/bcrypt|Traceback.*most recent|_bcrypt\.__about__|version = _bcrypt|\^\^\^\^\^\^\^\^\^)"
 
 # ===== Database Access Commands =====
 
