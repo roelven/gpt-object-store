@@ -867,16 +867,7 @@ paths:
   /v1/gpts/{gpt_id}/collections/{collection_name}/objects:
     post:
       summary: Create an object
-      description: |
-        Create a new object in a collection with JSON Schema validation.
-        
-        IMPORTANT: 
-        - Wrap your data in a 'body' field. Do not send fields directly.
-        - Do NOT include gpt_id or collection_name in the request body - they are provided in the URL path.
-        - Only send: {"body": {"your": "data", "goes": "here"}}
-        
-        The gpt_id and collection_name are automatically extracted from the URL path parameters.
-        Schema validation applied if defined.
+      description: Create object in collection with JSON Schema validation. IMPORTANT: Wrap data in 'body' field - send {"body": {"your": "data"}} not raw fields. Schema validation applied if defined.
       operationId: createObject
       x-openai-isConsequential: false
       tags: [Objects]
