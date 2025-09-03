@@ -83,7 +83,7 @@ create-gpt:
 # Generate API key for a GPT
 create-key:
 	@test -n "$(GPT_ID)" || (echo "Error: GPT_ID is required. Usage: make create-key GPT_ID=my-gpt" && exit 1)
-	@printf 'import asyncio\nimport sys\nsys.path.append("/app")\nfrom src.auth.api_key import create_api_key\ntry:\n    key = asyncio.run(create_api_key("$(GPT_ID)"))\n    print("")\n    print("==============================================")\n    print("API Key created successfully!")\n    print("==============================================")\n    print(f"API Key: {key}")\n    print("==============================================")\n    print("⚠️  Save this key securely - it cannot be retrieved again")\n    print("")\nexcept Exception as e:\n    print(f"Error: {e}")\n    sys.exit(1)\n' | docker compose exec -T api python
+	@(printf 'import asyncio\nimport sys\nsys.path.append("/app")\nfrom src.auth.api_key import create_api_key\ntry:\n    key = asyncio.run(create_api_key("$(GPT_ID)"))\n    print("")\n    print("==============================================")\n    print("API Key created successfully!")\n    print("==============================================")\n    print(f"API Key: {key}")\n    print("==============================================")\n    print("⚠️  Save this key securely - it cannot be retrieved again")\n    print("")\nexcept Exception as e:\n    print(f"Error: {e}")\n    sys.exit(1)\n' | docker compose exec -T api python) 2>&1 | grep -vE "(trapped.*error reading bcrypt|AttributeError.*__about__|passlib/handlers/bcrypt|Traceback.*most recent|_bcrypt\.__about__|version = _bcrypt|\^\^\^\^\^\^\^\^\^)"
 
 # List API keys for a GPT
 list-keys:

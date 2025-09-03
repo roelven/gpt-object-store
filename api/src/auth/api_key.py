@@ -2,6 +2,7 @@
 
 import hashlib
 import secrets
+import warnings
 from typing import Optional
 from datetime import datetime
 
@@ -34,6 +35,20 @@ def hash_api_key(api_key: str) -> bytes:
     Returns:
         Hashed API key as bytes
     """
+    import sys
+    import os
+    from contextlib import redirect_stderr
+    
+    # Suppress bcrypt version detection error output
+    with open(os.devnull, 'w') as devnull:
+        with redirect_stderr(devnull):
+            try:
+                return pwd_context.hash(api_key).encode('utf-8')
+            except Exception:
+                # If there's an error, fall back without stderr redirection
+                pass
+    
+    # Fallback without redirection
     return pwd_context.hash(api_key).encode('utf-8')
 
 
