@@ -83,24 +83,7 @@ create-gpt:
 # Generate API key for a GPT
 create-key:
 	@test -n "$(GPT_ID)" || (echo "Error: GPT_ID is required. Usage: make create-key GPT_ID=my-gpt" && exit 1)
-	@docker compose exec api python -c "\
-import asyncio; \
-import sys; \
-sys.path.append('/app'); \
-from src.auth.api_key import create_api_key; \
-try: \
-    key = asyncio.run(create_api_key('$(GPT_ID)')); \
-    print(''); \
-    print('=============================================='); \
-    print('API Key created successfully!'); \
-    print('=============================================='); \
-    print(f'API Key: {key}'); \
-    print('=============================================='); \
-    print('⚠️  Save this key securely - it cannot be retrieved again'); \
-    print(''); \
-except Exception as e: \
-    print(f'Error: {e}'); \
-    sys.exit(1);"
+	@printf 'import asyncio\nimport sys\nsys.path.append("/app")\nfrom src.auth.api_key import create_api_key\ntry:\n    key = asyncio.run(create_api_key("$(GPT_ID)"))\n    print("")\n    print("==============================================")\n    print("API Key created successfully!")\n    print("==============================================")\n    print(f"API Key: {key}")\n    print("==============================================")\n    print("⚠️  Save this key securely - it cannot be retrieved again")\n    print("")\nexcept Exception as e:\n    print(f"Error: {e}")\n    sys.exit(1)\n' | docker compose exec -T api python
 
 # List API keys for a GPT
 list-keys:
