@@ -38,12 +38,10 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
     
     async def dispatch(self, request: Request, call_next):
         """Process the request through authentication middleware."""
-        print(f"DEBUG: AuthMiddleware called for {request.url.path}")  # Force output
         logger.info(f"AuthMiddleware: Processing request for {request.url.path}")
         
         # Skip authentication for certain paths
         if request.url.path in self.skip_paths:
-            print(f"DEBUG: Skipping auth for {request.url.path}")  # Force output  
             logger.debug(f"AuthMiddleware: Skipping authentication for {request.url.path}")
             return await call_next(request)
         

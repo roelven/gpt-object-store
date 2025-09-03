@@ -104,7 +104,7 @@ def create_app() -> FastAPI:
             spec = custom_openapi.copy()
             # Update server URL with the actual API_URL from settings
             if 'servers' in spec and spec['servers']:
-                spec['servers'][0]['url'] = f"{settings.api_url}/v1"
+                spec['servers'][0]['url'] = settings.api_url
             return spec
         
         app.openapi = get_custom_openapi
@@ -120,11 +120,19 @@ def create_app() -> FastAPI:
         )
     
     # Add rate limiting middleware (before CORS to limit all requests)
-    app.add_middleware(RateLimitMiddleware)
+    # Use same skip paths as auth middleware
+    rate_limit_skip_paths = [
+        "/health", "/ready", "/live", "/", "/docs", "/redoc", "/openapi.json",
+        "/v1/health", "/v1/ready", "/v1/live", "/v1/"
+    ]
+    app.add_middleware(RateLimitMiddleware, skip_paths=rate_limit_skip_paths)
     
     # Add authentication middleware (after rate limiting, before CORS)
-    # Skip paths for health checks and docs
-    auth_skip_paths = ["/health", "/ready", "/live", "/", "/docs", "/redoc", "/openapi.json"]
+    # Skip paths for health checks and docs (include both with and without /v1 prefix)
+    auth_skip_paths = [
+        "/health", "/ready", "/live", "/", "/docs", "/redoc", "/openapi.json",
+        "/v1/health", "/v1/ready", "/v1/live", "/v1/"
+    ]
     app.add_middleware(AuthenticationMiddleware, skip_paths=auth_skip_paths)
     
     # Configure CORS

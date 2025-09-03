@@ -31,7 +31,7 @@ info:
     url: https://opensource.org/licenses/MIT
 
 servers:
-  - url: https://api.yourdomain.com/v1
+  - url: https://api.yourdomain.com
     description: Production server
 
 components:
@@ -582,7 +582,7 @@ paths:
                 $ref: '#/components/schemas/LivenessStatus'
 
   # Collections endpoints
-  /gpts/{gpt_id}/collections:
+  /v1/gpts/{gpt_id}/collections:
     post:
       summary: Create or update a collection
       description: |
@@ -708,7 +708,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-  /gpts/{gpt_id}/collections/{collection_name}:
+  /v1/gpts/{gpt_id}/collections/{collection_name}:
     get:
       summary: Get a collection
       description: Retrieve a specific collection by name
@@ -851,7 +851,7 @@ paths:
           $ref: '#/components/responses/InternalServerError'
 
   # Collection objects endpoints
-  /gpts/{gpt_id}/collections/{collection_name}/objects:
+  /v1/gpts/{gpt_id}/collections/{collection_name}/objects:
     post:
       summary: Create an object
       description: |
@@ -996,7 +996,7 @@ paths:
           $ref: '#/components/responses/InternalServerError'
 
   # Direct object endpoints
-  /objects/{object_id}:
+  /v1/objects/{object_id}:
     get:
       summary: Get an object
       description: |
