@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     debug: bool = False
     host: str = "0.0.0.0"
     port: int = 8000
+    api_url: str = "http://localhost:8000"
     
     # Database settings
     database_url: str = "postgresql://gptstore:change-me@localhost:5432/gptstore"
