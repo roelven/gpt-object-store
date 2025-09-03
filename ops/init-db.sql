@@ -18,8 +18,7 @@ ALTER DATABASE gptstore SET log_min_duration_statement = 1000;
 
 -- Ensure proper locale for consistent sorting
 -- This is important for stable pagination ordering
-SHOW lc_collate;
-SHOW lc_ctype;
+SELECT name, setting FROM pg_settings WHERE name IN ('lc_collate', 'lc_ctype');
 
 -- Log successful initialization
 SELECT 'GPT Object Store database initialized successfully' AS status;

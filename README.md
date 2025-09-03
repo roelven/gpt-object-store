@@ -97,13 +97,20 @@ uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 
 ### Docker Deployment
 
-1. **Start all services**
+1. **Configure environment variables** (Required!)
 ```bash
 cd ops
+cp .env.sample .env
+# Edit .env and set API_URL to your domain (required)
+vim .env  # Change API_URL from localhost to your actual domain
+```
+
+2. **Start all services**
+```bash
 make up
 ```
 
-2. **Check service health**
+3. **Check service health**
 ```bash
 make status
 ```
