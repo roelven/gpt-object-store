@@ -867,7 +867,7 @@ paths:
   /v1/gpts/{gpt_id}/collections/{collection_name}/objects:
     post:
       summary: Create an object
-      description: Create object in collection with JSON Schema validation. IMPORTANT: Wrap data in 'body' field - send {"body": {"your": "data"}} not raw fields. Schema validation applied if defined.
+      description: "Create object in collection with JSON Schema validation. IMPORTANT: Wrap data in 'body' field - send {\"body\": {\"your\": \"data\"}} not raw fields. Schema validation applied if defined."
       operationId: createObject
       x-openai-isConsequential: false
       tags: [Objects]
