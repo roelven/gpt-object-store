@@ -57,14 +57,12 @@ def main():
     
     success, stdout, stderr = run_curl_command("Create Collection with Correct Schema Field (LOCAL)", create_collection_cmd)
     
-    # Test 2: Create object with proper body wrapper
+    # Test 2: Create object with direct fields (new GPT Actions format)
     object_data = {
-        "body": {
-            "date": "2025-09-03",
-            "entry": "Local test diary entry to verify the API works correctly",
-            "mood": "neutral",
-            "tags": ["testing", "api", "debugging", "local"]
-        }
+        "date": "2025-09-03",
+        "entry": "Local test diary entry to verify the API works correctly",
+        "mood": "neutral",
+        "tags": ["testing", "api", "debugging", "local"]
     }
     
     create_object_cmd = f'''curl -X POST "{BASE_URL}/v1/gpts/{GPT_ID}/collections/diary_entries_local/objects" \\
@@ -73,7 +71,7 @@ def main():
   -d '{json.dumps(object_data, separators=(",", ":"))}' \\
   -w "\\nHTTP_CODE: %{{http_code}}\\n"'''
     
-    run_curl_command("Create Object with Body Wrapper (LOCAL)", create_object_cmd)
+    run_curl_command("Create Object with Direct Fields (LOCAL)", create_object_cmd)
     
     # Test 3: List objects to see what was created
     list_objects_cmd = f'''curl -X GET "{BASE_URL}/v1/gpts/{GPT_ID}/collections/diary_entries_local/objects" \\

@@ -12,8 +12,8 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 from fastapi import status
 
-from api.src.main import app
-from api.src.models.objects import Object
+from src.main import app
+from src.models.objects import Object
 
 
 class TestGPTActionsFormat:
@@ -32,23 +32,21 @@ class TestGPTActionsFormat:
     def test_exact_gpt_actions_request_format(self, client, auth_headers):
         """Test the exact JSON format that GPT Actions should send.
         
-        This test validates the target format:
+        This test validates the new direct field format:
         {
-          "body": {
-            "date": "2025-09-03",
-            "entry": "Had a rough start but turned into a productive day",
-            "mood": "neutral",
-            "tags": ["sleep", "health", "productivity", "nature"]
-          }
+          "date": "2025-09-03",
+          "entry": "Had a rough start but turned into a productive day",
+          "mood": "neutral",
+          "tags": ["sleep", "health", "productivity", "nature"]
         }
         
         Key requirements:
-        - Only 'body' field in request JSON
+        - Send fields directly (not wrapped in 'body')
         - No path parameters (gpt_id, collection_name) in request body
-        - Clean diary entry structure inside body
+        - Clean diary entry structure
         """
         # Mock the create_object function to return a successful response
-        with patch('api.src.routes.objects.create_object') as mock_create:
+        with patch('src.routes.objects.create_object') as mock_create:
             mock_create.return_value = Object(
                 id=uuid4(),
                 gpt_id="diary-gpt",
@@ -63,17 +61,15 @@ class TestGPTActionsFormat:
                 updated_at=datetime.now(timezone.utc)
             )
             
-            # Test the exact format GPT Actions should send
+            # Test the new direct field format GPT Actions should send
             response = client.post(
                 "/v1/gpts/diary-gpt/collections/diary_entries/objects",
                 headers=auth_headers,
                 json={
-                    "body": {
-                        "date": "2025-09-03",
-                        "entry": "Had a rough start but turned into a productive day",
-                        "mood": "neutral",
-                        "tags": ["sleep", "health", "productivity", "nature"]
-                    }
+                    "date": "2025-09-03",
+                    "entry": "Had a rough start but turned into a productive day",
+                    "mood": "neutral",
+                    "tags": ["sleep", "health", "productivity", "nature"]
                 }
             )
             
@@ -90,78 +86,95 @@ class TestGPTActionsFormat:
             assert data["body"]["mood"] == "neutral"
             assert data["body"]["tags"] == ["sleep", "health", "productivity", "nature"]
     
-    def test_request_body_rejects_path_parameters(self, client, auth_headers):
-        """Test that request body rejects path parameters like gpt_id and collection_name.
+    def test_direct_fields_work_with_extra_fields(self, client, auth_headers):
+        """Test that direct fields work even with extra unknown fields.
         
-        This ensures GPT Actions cannot send:
-        {
-          "gpt_id": "diary-gpt",
-          "collection_name": "diary_entries", 
-          "body": {...}
-        }
+        The new design allows extra fields for maximum GPT Actions compatibility.
         """
-        response = client.post(
-            "/v1/gpts/diary-gpt/collections/diary_entries/objects",
-            headers=auth_headers,
-            json={
-                "gpt_id": "diary-gpt",  # Should be rejected
-                "collection_name": "diary_entries",  # Should be rejected
-                "body": {
+        with patch('src.routes.objects.create_object') as mock_create:
+            mock_create.return_value = Object(
+                id=uuid4(),
+                gpt_id="diary-gpt", 
+                collection="diary_entries",
+                body={
                     "date": "2025-09-03",
                     "entry": "Test entry",
                     "mood": "neutral",
-                    "tags": ["test"]
+                    "tags": ["test"],
+                    "unknown_field": "should_be_accepted"
+                },
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc)
+            )
+        
+            response = client.post(
+                "/v1/gpts/diary-gpt/collections/diary_entries/objects",
+                headers=auth_headers,
+                json={
+                    "date": "2025-09-03",
+                    "entry": "Test entry", 
+                    "mood": "neutral",
+                    "tags": ["test"],
+                    "unknown_field": "should_be_accepted"  # Extra fields now allowed
                 }
-            }
-        )
-        
-        # Should fail with 422 Unprocessable Entity due to extra fields
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
-        assert response.headers["content-type"] == "application/problem+json"
-        
-        error_data = response.json()
-        detail = error_data.get("detail", "").lower()
-        
-        # Should mention extra/forbidden/additional fields
-        assert any(word in detail for word in ["extra", "forbidden", "additional", "not permitted"])
+            )
+            
+            # Should succeed with 201 Created
+            assert response.status_code == status.HTTP_201_CREATED
     
-    def test_request_body_requires_body_field(self, client, auth_headers):
-        """Test that request body requires the 'body' field."""
-        response = client.post(
-            "/v1/gpts/diary-gpt/collections/diary_entries/objects",
-            headers=auth_headers,
-            json={
-                "date": "2025-09-03",  # Should be inside 'body' field
-                "entry": "Test entry",
-                "mood": "neutral"
-            }
-        )
-        
-        # Should fail with 422 due to missing 'body' field
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
-        
-        error_data = response.json()
-        detail = error_data.get("detail", "").lower()
-        assert "body" in detail or "field required" in detail
+    def test_direct_fields_work_without_wrapper(self, client, auth_headers):
+        """Test that direct fields work without 'body' wrapper (new format)."""
+        with patch('src.routes.objects.create_object') as mock_create:
+            mock_create.return_value = Object(
+                id=uuid4(),
+                gpt_id="diary-gpt",
+                collection="diary_entries",
+                body={
+                    "date": "2025-09-03",
+                    "entry": "Test entry",
+                    "mood": "neutral"
+                },
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc)
+            )
+            
+            response = client.post(
+                "/v1/gpts/diary-gpt/collections/diary_entries/objects",
+                headers=auth_headers,
+                json={
+                    "date": "2025-09-03",  # Direct fields now work
+                    "entry": "Test entry",
+                    "mood": "neutral"
+                }
+            )
+            
+            # Should succeed with 201 Created 
+            assert response.status_code == status.HTTP_201_CREATED
     
     def test_empty_request_body_validation(self, client, auth_headers):
         """Test validation of completely empty request body."""
-        response = client.post(
-            "/v1/gpts/diary-gpt/collections/diary_entries/objects",
-            headers=auth_headers,
-            json={}
-        )
-        
-        # Should fail with 422 due to missing required 'body' field
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
-        
-        error_data = response.json()
-        detail = error_data.get("detail", "").lower()
-        assert "body" in detail and "required" in detail
+        with patch('src.routes.objects.create_object') as mock_create:
+            mock_create.return_value = Object(
+                id=uuid4(),
+                gpt_id="diary-gpt",
+                collection="diary_entries",
+                body={},  # Empty body is allowed
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc)
+            )
+            
+            response = client.post(
+                "/v1/gpts/diary-gpt/collections/diary_entries/objects",
+                headers=auth_headers,
+                json={}
+            )
+            
+            # Should succeed - empty requests are now allowed
+            assert response.status_code == status.HTTP_201_CREATED
     
-    def test_body_field_content_validation(self, client, auth_headers):
-        """Test that body field accepts arbitrary JSON structure."""
-        with patch('api.src.routes.objects.create_object') as mock_create:
+    def test_arbitrary_json_structure_validation(self, client, auth_headers):
+        """Test that direct fields accept arbitrary JSON structure."""
+        with patch('src.routes.objects.create_object') as mock_create:
             mock_create.return_value = Object(
                 id=uuid4(),
                 gpt_id="diary-gpt",
@@ -179,11 +192,9 @@ class TestGPTActionsFormat:
                 "/v1/gpts/diary-gpt/collections/diary_entries/objects",
                 headers=auth_headers,
                 json={
-                    "body": {
-                        "custom_field": "custom_value",
-                        "nested": {"data": "structure"},
-                        "array": [1, 2, 3]
-                    }
+                    "custom_field": "custom_value",  # Direct fields
+                    "nested": {"data": "structure"},
+                    "array": [1, 2, 3]
                 }
             )
             
@@ -198,7 +209,7 @@ class TestGPTActionsFormat:
         
         Even if someone somehow sends path params in body, the URL path values should win.
         """
-        with patch('api.src.routes.objects.create_object') as mock_create:
+        with patch('src.routes.objects.create_object') as mock_create:
             # Verify that the create_object function gets called with path values, not body values
             mock_create.return_value = Object(
                 id=uuid4(),
@@ -264,7 +275,7 @@ class TestGPTActionsFormat:
         ]
         
         for test_case in test_cases:
-            with patch('api.src.routes.objects.create_object') as mock_create:
+            with patch('src.routes.objects.create_object') as mock_create:
                 mock_create.return_value = Object(
                     id=uuid4(),
                     gpt_id="diary-gpt",

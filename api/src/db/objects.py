@@ -93,8 +93,11 @@ async def create_object(
     pool = await get_db_pool()
     
     try:
+        # Convert direct fields to body format for database storage
+        body_data = object_data.to_body_format()["body"]
+        
         # Validate object against collection schema if present
-        await validate_object_against_schema(gpt_id, collection_name, object_data.body)
+        await validate_object_against_schema(gpt_id, collection_name, body_data)
         
         async with pool.acquire() as conn:
             query = """
@@ -107,7 +110,7 @@ async def create_object(
                 query,
                 gpt_id,
                 collection_name,
-                json.dumps(object_data.body)  # Convert dict to JSONB
+                json.dumps(body_data)  # Convert dict to JSONB
             )
             
             if not row:
@@ -310,10 +313,13 @@ async def update_object(
             # First, get the current object to validate ownership and get collection info
             current_object = await get_object(object_id, gpt_id)
             
+            # Convert direct fields to body format for database storage
+            update_body_format = update_data.to_body_format()
+            
             # Determine the new body data
-            if update_data.body is not None:
+            if update_body_format.get("body"):
                 # For partial updates, merge with existing data
-                new_body = {**current_object.body, **update_data.body}
+                new_body = {**current_object.body, **update_body_format["body"]}
             else:
                 # No body update, keep existing
                 new_body = current_object.body

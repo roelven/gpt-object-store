@@ -192,37 +192,57 @@ components:
     
     ObjectCreate:
       type: object
-      required: [body]
       description: |
-        Request body for creating an object. 
-        IMPORTANT: Only include the 'body' field - do not include gpt_id, collection_name, or any path parameters.
-        The gpt_id and collection_name are provided in the URL path, not in the request body.
-      additionalProperties: false
+        Request body for creating an object. Send your object data directly as fields.
+        GPT Actions sends fields directly, not wrapped in a 'body' field.
+        Do not include gpt_id or collection_name - they are path parameters.
+      additionalProperties: true
       properties:
-        body:
-          type: object
-          description: |
-            Object JSON data - all your actual data goes inside this body field.
-            Do not include gpt_id or collection_name here - they are path parameters.
-          additionalProperties: true
+        date:
+          type: string
+          format: date
+          description: Date of the entry
+          example: "2025-09-03"
+        entry:
+          type: string
+          description: The diary entry content
+          example: "Today was a wonderful day! I spent time working on projects and felt very productive."
+        mood:
+          type: string
+          description: Mood for this entry
+          enum: ["happy", "sad", "neutral", "excited", "anxious"]
+          example: "happy"
+        tags:
+          type: array
+          items:
+            type: string
+          description: Tags for this entry
+          example: ["personal", "daily", "productivity"]
       example:
-        body:
-          date: "2025-09-03"
-          entry: "Today was a wonderful day! I spent time working on projects and felt very productive."
-          mood: "happy"
-          tags: ["personal", "daily", "productivity"]
+        date: "2025-09-03"
+        entry: "Today was a wonderful day! I spent time working on projects and felt very productive."
+        mood: "happy"
+        tags: ["personal", "daily", "productivity"]
     
     ObjectUpdate:
       type: object
+      description: |
+        Request body for updating an object. Send your updated fields directly.
+        GPT Actions sends fields directly, not wrapped in a 'body' field.
+      additionalProperties: true
       properties:
-        body:
-          type: object
-          nullable: true
-          description: Updated object JSON data (partial or complete)
+        mood:
+          type: string
+          description: Updated mood
+          enum: ["happy", "sad", "neutral", "excited", "anxious"]
+        tags:
+          type: array
+          items:
+            type: string
+          description: Updated tags
       example:
-        body:
-          priority: "high"
-          tags: ["work", "urgent"]
+        mood: "excited"
+        tags: ["work", "urgent"]
     
     ObjectListResponse:
       type: object
@@ -835,7 +855,7 @@ paths:
   /v1/gpts/{gpt_id}/collections/{collection_name}/objects:
     post:
       summary: Create an object
-      description: "Create object in collection with JSON Schema validation. IMPORTANT: Wrap data in 'body' field - send {\"body\": {\"your\": \"data\"}} not raw fields. Schema validation applied if defined."
+      description: "Create object in collection with JSON Schema validation. Send your data directly as fields - GPT Actions cannot wrap data in 'body' field. Schema validation applied if defined."
       operationId: createObject
       x-openai-isConsequential: false
       tags: [Objects]
@@ -864,44 +884,33 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [body]
-              properties:
-                body:
-                  type: object
-                  additionalProperties: true
-                  description: "Object data - your content goes here"
-              additionalProperties: false
-              description: "Request body with object data wrapped in 'body' field"
+              $ref: '#/components/schemas/ObjectCreate'
             examples:
               diary_entry:
                 summary: Diary entry object
-                description: Example for diary GPT - exact format to use
+                description: Example for diary GPT - send fields directly
                 value:
-                  body:
-                    date: "2025-09-03"
-                    entry: "Had a rough start but turned into a productive day"
-                    mood: "neutral"
-                    tags: ["sleep", "health", "productivity", "nature"]
+                  date: "2025-09-03"
+                  entry: "Had a rough start but turned into a productive day"
+                  mood: "neutral"
+                  tags: ["sleep", "health", "productivity", "nature"]
               note:
                 summary: Note object  
-                description: Example note - all data must be inside the body field
+                description: Example note - send fields directly
                 value:
-                  body:
-                    title: "My First Note"
-                    content: "This is the content of my note"
-                    tags: ["personal", "ideas"]
-                    priority: "medium"
+                  title: "My First Note"
+                  content: "This is the content of my note"
+                  tags: ["personal", "ideas"]
+                  priority: "medium"
               task:
                 summary: Task object
-                description: Example task - wrap your data in the body field
+                description: Example task - send fields directly
                 value:
-                  body:
-                    name: "Complete project"
-                    completed: false
-                    due_date: "2024-01-15"
-                    priority: "high"
-                    assignee: "Alice"
+                  name: "Complete project"
+                  completed: false
+                  due_date: "2024-01-15"
+                  priority: "high"
+                  assignee: "Alice"
       responses:
         '201':
           description: Object created successfully
@@ -1049,18 +1058,10 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                body:
-                  type: object
-                  additionalProperties: true
-                  description: "Updated object data (partial or complete)"
-              additionalProperties: false
-              description: "Request body with updated object data wrapped in 'body' field"
+              $ref: '#/components/schemas/ObjectUpdate'
             example:
-              body:
-                priority: "high"
-                tags: ["work", "urgent"]
+              mood: "excited"
+              tags: ["work", "urgent"]
       responses:
         '200':
           $ref: '#/components/responses/Object'

@@ -20,51 +20,52 @@ class ObjectBase(BaseModel):
     )
 
 
-class ObjectCreate(ObjectBase):
+class ObjectCreate(BaseModel):
     """Model for creating a new object.
     
-    This model strictly enforces that only the 'body' field is accepted
-    in the request, rejecting any extra fields like path parameters.
+    Accepts arbitrary fields directly (as GPT Actions sends them) and
+    internally wraps them in a 'body' field for database storage.
+    GPT Actions cannot send wrapper objects, so we accept direct fields.
     """
     
     model_config = ConfigDict(
-        extra="forbid",  # Strictly reject any additional fields
+        extra="allow",  # Allow any fields for flexible GPT Actions input
         json_schema_extra={
             "example": {
-                "body": {
-                    "date": "2025-09-03",
-                    "entry": "Had a rough start but turned into a productive day",
-                    "mood": "neutral",
-                    "tags": ["sleep", "health", "productivity", "nature"]
-                }
+                "date": "2025-09-03",
+                "entry": "Had a rough start but turned into a productive day",
+                "mood": "neutral",
+                "tags": ["sleep", "health", "productivity", "nature"]
             }
         }
     )
+    
+    def to_body_format(self) -> Dict[str, Any]:
+        """Convert direct fields to body format for database storage."""
+        return {"body": self.model_dump()}
 
 
 class ObjectUpdate(BaseModel):
     """Model for updating an object (partial updates).
     
-    This model strictly enforces that only the 'body' field is accepted
-    in the request, rejecting any extra fields like path parameters.
+    Accepts arbitrary fields directly (as GPT Actions sends them) and
+    internally wraps them in a 'body' field for database storage.
     """
     
-    body: Optional[Dict[str, Any]] = Field(
-        default=None,
-        description="Updated object JSON data (partial or complete)"
-    )
-    
     model_config = ConfigDict(
-        extra="forbid",  # Strictly reject any additional fields
+        extra="allow",  # Allow any fields for flexible GPT Actions input
         json_schema_extra={
             "example": {
-                "body": {
-                    "priority": "high",
-                    "tags": ["work", "urgent"]
-                }
+                "priority": "high",
+                "tags": ["work", "urgent"]
             }
         }
     )
+    
+    def to_body_format(self) -> Dict[str, Any]:
+        """Convert direct fields to body format for database storage."""
+        data = self.model_dump(exclude_unset=True)
+        return {"body": data} if data else {}
 
 
 class Object(ObjectBase):

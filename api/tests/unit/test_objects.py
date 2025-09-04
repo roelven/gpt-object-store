@@ -37,21 +37,32 @@ class TestObjectModels:
     def test_object_create_model(self):
         """Test ObjectCreate model validation."""
         data = {
-            "body": {"title": "Test Note", "content": "Note content"}
+            "title": "Test Note", 
+            "content": "Note content",
+            "date": "2025-09-03"
         }
         obj = ObjectCreate(**data)
-        assert obj.body == data["body"]
+        assert obj.model_dump() == data
+        
+        # Test to_body_format method
+        body_format = obj.to_body_format()
+        assert body_format == {"body": data}
     
     def test_object_update_model(self):
         """Test ObjectUpdate model validation."""
-        # Test with body
-        data = {"body": {"priority": "high"}}
+        # Test with direct fields
+        data = {"priority": "high", "mood": "excited"}
         obj = ObjectUpdate(**data)
-        assert obj.body == data["body"]
+        assert obj.model_dump() == data
         
-        # Test with None body (no update)
-        obj_none = ObjectUpdate()
-        assert obj_none.body is None
+        # Test to_body_format method
+        body_format = obj.to_body_format()
+        assert body_format == {"body": data}
+        
+        # Test with empty update
+        obj_empty = ObjectUpdate()
+        assert obj_empty.model_dump() == {}
+        assert obj_empty.to_body_format() == {}
     
     def test_object_model(self):
         """Test complete Object model."""
