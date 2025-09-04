@@ -231,18 +231,30 @@ components:
         GPT Actions sends fields directly, not wrapped in a 'body' field.
       additionalProperties: true
       properties:
+        date:
+          type: string
+          format: date
+          description: Updated date
+          example: "2025-09-04"
+        entry:
+          type: string
+          description: Updated diary entry content
+          example: "Updated entry content with new insights and reflections"
         mood:
           type: string
           description: Updated mood
           enum: ["happy", "sad", "neutral", "excited", "anxious"]
+          example: "excited"
         tags:
           type: array
           items:
             type: string
           description: Updated tags
+          example: ["work", "urgent", "updated"]
       example:
+        entry: "Updated entry content with new insights and reflections"
         mood: "excited"
-        tags: ["work", "urgent"]
+        tags: ["work", "urgent", "updated"]
     
     ObjectListResponse:
       type: object
@@ -1060,8 +1072,9 @@ paths:
             schema:
               $ref: '#/components/schemas/ObjectUpdate'
             example:
+              entry: "Updated entry content with new insights and reflections"
               mood: "excited"
-              tags: ["work", "urgent"]
+              tags: ["work", "urgent", "updated"]
       responses:
         '200':
           $ref: '#/components/responses/Object'

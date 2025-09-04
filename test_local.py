@@ -71,14 +71,47 @@ def main():
   -d '{json.dumps(object_data, separators=(",", ":"))}' \\
   -w "\\nHTTP_CODE: %{{http_code}}\\n"'''
     
-    run_curl_command("Create Object with Direct Fields (LOCAL)", create_object_cmd)
+    success, stdout, stderr = run_curl_command("Create Object with Direct Fields (LOCAL)", create_object_cmd)
     
-    # Test 3: List objects to see what was created
+    # Extract object ID from create response for update test
+    object_id = None
+    if success and "HTTP_CODE: 201" in stdout:
+        try:
+            # Find the JSON response before HTTP_CODE
+            json_start = stdout.find('{"id"')
+            json_end = stdout.find('\nHTTP_CODE:')
+            if json_start != -1 and json_end != -1:
+                json_str = stdout[json_start:json_end].strip()
+                response_data = json.loads(json_str)
+                object_id = response_data.get("id")
+                print(f"Created object with ID: {object_id}")
+        except Exception as e:
+            print(f"Could not extract object ID: {e}")
+    
+    # Test 3: Update object entry field (the main test for GPT Actions compatibility)
+    if object_id:
+        update_data = {
+            "entry": "UPDATED: Local test diary entry with new content to verify entry updates work",
+            "mood": "excited",
+            "tags": ["testing", "api", "debugging", "local", "updated"]
+        }
+        
+        update_object_cmd = f'''curl -X PATCH "{BASE_URL}/v1/objects/{object_id}" \\
+  -H "Authorization: Bearer {API_KEY}" \\
+  -H "Content-Type: application/json" \\
+  -d '{json.dumps(update_data, separators=(",", ":"))}' \\
+  -w "\\nHTTP_CODE: %{{http_code}}\\n"'''
+        
+        run_curl_command("Update Object Entry Field (LOCAL)", update_object_cmd)
+    else:
+        print("Skipping update test - could not extract object ID from create response")
+    
+    # Test 4: List objects to see what was created and updated
     list_objects_cmd = f'''curl -X GET "{BASE_URL}/v1/gpts/{GPT_ID}/collections/diary_entries_local/objects" \\
   -H "Authorization: Bearer {API_KEY}" \\
   -w "\\nHTTP_CODE: %{{http_code}}\\n"'''
     
-    run_curl_command("List Objects (LOCAL)", list_objects_cmd)
+    run_curl_command("List Objects After Update (LOCAL)", list_objects_cmd)
 
 if __name__ == "__main__":
     main()
