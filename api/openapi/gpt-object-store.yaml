@@ -545,51 +545,19 @@ paths:
   /health:
     get:
       summary: Health check
-      description: Health check endpoint with database connectivity test
+      description: Consolidated health, readiness, and liveness check endpoint
       operationId: healthCheck
       tags: [Health]
       security: []
       responses:
         '200':
-          description: Service is healthy
+          description: Service is healthy, ready, and alive
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthStatus'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-
-  /ready:
-    get:
-      summary: Readiness check
-      description: Kubernetes-style readiness check endpoint
-      operationId: readinessCheck
-      tags: [Health]
-      security: []
-      responses:
-        '200':
-          description: Service is ready
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ReadinessStatus'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-
-  /live:
-    get:
-      summary: Liveness check
-      description: Kubernetes-style liveness check endpoint
-      operationId: livenessCheck
-      tags: [Health]
-      security: []
-      responses:
-        '200':
-          description: Service is alive
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LivenessStatus'
 
   # Collections endpoints
   /v1/gpts/{gpt_id}/collections:
@@ -896,17 +864,25 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ObjectCreate'
+              type: object
+              required: [body]
+              properties:
+                body:
+                  type: object
+                  additionalProperties: true
+                  description: "Object data - your content goes here"
+              additionalProperties: false
+              description: "Request body with object data wrapped in 'body' field"
             examples:
               diary_entry:
                 summary: Diary entry object
-                description: Example for diary GPT - note the body wrapper is required
+                description: Example for diary GPT - exact format to use
                 value:
                   body:
                     date: "2025-09-03"
-                    entry: "Today was a wonderful day! I spent time working on projects and felt very productive."
-                    mood: "happy"
-                    tags: ["personal", "daily", "productivity"]
+                    entry: "Had a rough start but turned into a productive day"
+                    mood: "neutral"
+                    tags: ["sleep", "health", "productivity", "nature"]
               note:
                 summary: Note object  
                 description: Example note - all data must be inside the body field
@@ -1073,7 +1049,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ObjectUpdate'
+              type: object
+              properties:
+                body:
+                  type: object
+                  additionalProperties: true
+                  description: "Updated object data (partial or complete)"
+              additionalProperties: false
+              description: "Request body with updated object data wrapped in 'body' field"
             example:
               body:
                 priority: "high"

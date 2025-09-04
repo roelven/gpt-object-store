@@ -295,9 +295,7 @@ curl -H "Authorization: Bearer your-api-key" \
 - `DELETE /v1/objects/{id}` - Delete object
 
 #### Health
-- `GET /health` - Overall health status
-- `GET /ready` - Readiness check
-- `GET /live` - Liveness probe
+- `GET /health` - Consolidated health, readiness, and liveness check
 
 ### Pagination
 

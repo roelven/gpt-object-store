@@ -21,16 +21,21 @@ class ObjectBase(BaseModel):
 
 
 class ObjectCreate(ObjectBase):
-    """Model for creating a new object."""
+    """Model for creating a new object.
+    
+    This model strictly enforces that only the 'body' field is accepted
+    in the request, rejecting any extra fields like path parameters.
+    """
     
     model_config = ConfigDict(
+        extra="forbid",  # Strictly reject any additional fields
         json_schema_extra={
             "example": {
                 "body": {
-                    "title": "My First Note",
-                    "content": "This is the content of my note",
-                    "tags": ["personal", "ideas"],
-                    "priority": "medium"
+                    "date": "2025-09-03",
+                    "entry": "Had a rough start but turned into a productive day",
+                    "mood": "neutral",
+                    "tags": ["sleep", "health", "productivity", "nature"]
                 }
             }
         }
@@ -38,7 +43,11 @@ class ObjectCreate(ObjectBase):
 
 
 class ObjectUpdate(BaseModel):
-    """Model for updating an object (partial updates)."""
+    """Model for updating an object (partial updates).
+    
+    This model strictly enforces that only the 'body' field is accepted
+    in the request, rejecting any extra fields like path parameters.
+    """
     
     body: Optional[Dict[str, Any]] = Field(
         default=None,
@@ -46,6 +55,7 @@ class ObjectUpdate(BaseModel):
     )
     
     model_config = ConfigDict(
+        extra="forbid",  # Strictly reject any additional fields
         json_schema_extra={
             "example": {
                 "body": {
