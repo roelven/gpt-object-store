@@ -2,6 +2,8 @@
 
 This guide walks you through creating a Custom GPT that uses the GPT Object Store as its backend for persistent data storage. We'll build a **Daily Diary GPT** as an example - a personal journaling assistant that stores daily entries and provides weekly summaries.
 
+![Diary coach screengrab](screenshot.png)
+
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)
@@ -153,7 +155,7 @@ In the GPT Builder, go to the **Configure** tab and scroll to **Actions**:
 
 ### 3. Test the Connection
 
-Click "Test" to verify the GPT can connect to your API. You should see a successful response.
+After importing the schema, the configurator should show you the available actions. Click "Test" at healthCheck to verify the GPT can connect to your API. You should see a successful response.
 
 ## Writing GPT Instructions
 
@@ -319,74 +321,14 @@ Create guided journaling prompts:
 - Growth reflection: "What did you learn about yourself this week?"
 - Future planning: "What are your intentions for tomorrow?"
 
-### 4. Export Functionality
-
-While the GPT can't directly create files, it can format entries for copying:
-
-```markdown
-## Your Diary Entries - January 2024
-
-### January 15, 2024
-**Mood**: Happy
-**Tags**: work, achievement
-
-Today was fantastic! I finally completed the project...
-
----
-
-### January 14, 2024
-**Mood**: Neutral
-**Tags**: weekend, family
-
-Quiet Saturday with the family...
-```
 
 ## Troubleshooting
-
-### Common Issues and Solutions
-
-#### 1. Authentication Errors (401)
-
-**Problem**: "The GPT says it can't authenticate"
-
-**Solution**: 
-- Verify your API key is correct
-- Check that the Bearer token is properly configured
-- Ensure the API key hasn't been revoked
-
-#### 2. Connection Timeouts
-
-**Problem**: "The GPT times out when trying to save"
-
-**Solution**:
-- Check your API server is running and accessible
-- Verify HTTPS certificate is valid
-- Test the endpoint directly with curl
-
-#### 3. Data Not Persisting
-
-**Problem**: "Entries aren't being saved"
-
-**Solution**:
-- Check the GPT is calling the correct endpoints
-- Verify the collection exists
-- Check database connectivity
-
-#### 4. Rate Limiting (429)
-
-**Problem**: "Getting rate limit errors"
-
-**Solution**:
-- Default limits are 60 requests/minute
-- Implement pagination for large retrievals
-- Consider increasing limits in your deployment
-
-### Debugging Tips
 
 1. **Enable Debug Mode**: Ask the GPT to show you the exact API calls it's making
 2. **Check Logs**: Review your API server logs for errors
 3. **Test Manually**: Use curl to test the same operations
 4. **Verify Schema**: Ensure your OpenAPI schema matches your API
+
 
 ## Best Practices
 
@@ -411,22 +353,6 @@ Quiet Saturday with the family...
 - Optimize queries for common patterns
 - Monitor API response times
 
-### 4. Maintenance
-
-- Regular testing of all operations
-- Monitor error rates and user feedback
-- Update GPT instructions based on usage patterns
-- Keep API documentation synchronized
-
-## Extending Your Diary GPT
-
-### Integration Ideas
-
-1. **Calendar Integration**: Link entries to calendar events
-2. **Weather Context**: Add weather data to entries automatically
-3. **Photo Memories**: Reference photo URLs in entries
-4. **Health Tracking**: Integrate mood with sleep, exercise data
-5. **Writing Analytics**: Track writing patterns and vocabulary
 
 ### Multi-User Considerations
 
@@ -462,6 +388,3 @@ The GPT Object Store provides the flexible backend you need to build powerful, s
 - [API Reference](https://api.yourdomain.com/docs)
 - [Support and Issues](https://github.com/yourusername/gpt-object-store/issues)
 
----
-
-*Happy journaling! 📔✨*
